@@ -8,8 +8,12 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate, NSMenuItemValidat
     let document: AnnotationDocument
     private var cancellables = Set<AnyCancellable>()
 
+    /// View points per composite pixel.
     private var zoom: CGFloat = 1
-    private var imageOrigin: CGPoint = .zero
+    /// Top-left of the composite canvas in view coordinates.
+    private var canvasOrigin: CGPoint = .zero
+    /// Padding offset (composite pixels) between the canvas and the screenshot.
+    private var imageOffset: CGPoint = .zero
 
     private var inProgress: Annotation?
     private var dragStartDoc: CGPoint?
@@ -29,6 +33,12 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate, NSMenuItemValidat
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.needsDisplay = true }
             .store(in: &cancellables)
+        // Padding changes the composite size, so re-fit the zoom when the background style changes.
+        document.$backgroundStyle
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.needsLayout = true }
+            .store(in: &cancellables)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -45,24 +55,28 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate, NSMenuItemValidat
         super.layout()
         let margin: CGFloat = 24
         let avail = CGSize(width: max(bounds.width - margin * 2, 10), height: max(bounds.height - margin * 2, 10))
-        let px = document.pixelSize
+        let layout = document.compositeLayout
+        let px = layout.canvasSize
         let fit = min(avail.width / px.width, avail.height / px.height)
         zoom = min(fit, 1 / document.pixelScale)
         let shown = CGSize(width: px.width * zoom, height: px.height * zoom)
-        imageOrigin = CGPoint(x: (bounds.width - shown.width) / 2, y: (bounds.height - shown.height) / 2)
+        canvasOrigin = CGPoint(x: (bounds.width - shown.width) / 2, y: (bounds.height - shown.height) / 2)
+        imageOffset = layout.imageOffset
         repositionTextField()
         needsDisplay = true
     }
 
     // MARK: Coordinates
 
+    /// View point → image pixel coordinates (padding removed).
     private func docPoint(_ event: NSEvent) -> CGPoint {
         let p = convert(event.locationInWindow, from: nil)
-        return CGPoint(x: (p.x - imageOrigin.x) / zoom, y: (p.y - imageOrigin.y) / zoom)
+        return CGPoint(x: (p.x - canvasOrigin.x) / zoom - imageOffset.x, y: (p.y - canvasOrigin.y) / zoom - imageOffset.y)
     }
 
+    /// Image pixel coordinates → view point.
     private func viewPoint(_ doc: CGPoint) -> CGPoint {
-        CGPoint(x: imageOrigin.x + doc.x * zoom, y: imageOrigin.y + doc.y * zoom)
+        CGPoint(x: canvasOrigin.x + (doc.x + imageOffset.x) * zoom, y: canvasOrigin.y + (doc.y + imageOffset.y) * zoom)
     }
 
     private func clampToImage(_ p: CGPoint) -> CGPoint {
@@ -73,25 +87,37 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate, NSMenuItemValidat
 
     override func draw(_ dirtyRect: NSRect) {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let px = document.pixelSize
+        let layout = document.compositeLayout
+        let background = document.backgroundStyle
+        let canvasRect = CGRect(origin: .zero, size: layout.canvasSize)
 
         ctx.saveGState()
-        ctx.translateBy(x: imageOrigin.x, y: imageOrigin.y)
+        ctx.translateBy(x: canvasOrigin.x, y: canvasOrigin.y)
         ctx.scaleBy(x: zoom, y: zoom)
 
-        ctx.setShadow(offset: CGSize(width: 0, height: 4 / zoom), blur: 24 / zoom, color: CGColor(gray: 0, alpha: 0.5))
-        ctx.setFillColor(CGColor(gray: 1, alpha: 1))
-        ctx.fill(CGRect(origin: .zero, size: px))
-        ctx.setShadow(offset: .zero, blur: 0, color: nil)
+        // Canvas-only decoration: a soft shadow under the composite so it reads as a card on the dark view.
+        // When there is no background the transparent padding is outlined instead.
+        if background.kind != .none {
+            ctx.saveGState()
+            ctx.setShadow(offset: CGSize(width: 0, height: -4), blur: 24, color: CGColor(gray: 0, alpha: 0.5))
+            ctx.setFillColor(CGColor(gray: 0.5, alpha: 1))
+            ctx.fill(canvasRect)
+            ctx.restoreGState()
+        } else if background.padding > 0 {
+            ctx.saveGState()
+            ctx.setStrokeColor(CGColor(gray: 1, alpha: 0.18))
+            ctx.setLineWidth(1 / zoom)
+            ctx.setLineDash(phase: 0, lengths: [6 / zoom, 4 / zoom])
+            ctx.stroke(canvasRect.insetBy(dx: 0.5 / zoom, dy: 0.5 / zoom))
+            ctx.restoreGState()
+        }
 
-        ctx.clip(to: CGRect(origin: .zero, size: px))
-        AnnotationRenderer.drawImage(document.baseImage, in: CGRect(origin: .zero, size: px), context: ctx)
-        for a in document.annotations where a.id != editingTextID {
-            AnnotationRenderer.draw(a, in: ctx, pixelScale: document.pixelScale, pixelated: document.pixelatedImage, imageSize: px)
-        }
-        if let a = inProgress {
-            AnnotationRenderer.draw(a, in: ctx, pixelScale: document.pixelScale, pixelated: document.pixelatedImage, imageSize: px)
-        }
+        ctx.clip(to: canvasRect)
+        var shown = document.annotations.filter { $0.id != editingTextID }
+        if let a = inProgress { shown.append(a) }
+        AnnotationRenderer.drawComposite(image: document.baseImage, annotations: shown, pixelated: document.pixelatedImage,
+                                         background: background, layout: layout, pixelScale: document.pixelScale,
+                                         shadowScale: zoom, in: ctx)
         ctx.restoreGState()
 
         if let sel = document.selected, sel.id != editingTextID {

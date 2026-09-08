@@ -19,7 +19,9 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
         self.sourceItem = sourceItem
 
         let screen = NSScreen.underMouse.visibleFrame
-        let logical = CGSize(width: CGFloat(image.width) / pixelScale, height: CGFloat(image.height) / pixelScale)
+        // Size the window for the composite (image + remembered padding) so it opens at 1:1 when it fits.
+        let pad = annotationDocument.backgroundStyle.padding * 2
+        let logical = CGSize(width: CGFloat(image.width) / pixelScale + pad, height: CGFloat(image.height) / pixelScale + pad)
         let toolbarHeight: CGFloat = 52
         let width = min(max(logical.width + 48, 720), screen.width * 0.9)
         let height = min(max(logical.height + 48 + toolbarHeight, 480), screen.height * 0.9)
@@ -114,6 +116,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
 struct EditorView: View {
     @ObservedObject var document: AnnotationDocument
     unowned let controller: EditorWindowController
+    @State private var showBackground = false
 
     private let palette: [NSColor] = [.systemRed, .systemOrange, .systemYellow, .systemGreen, .systemBlue, .systemPurple, .black, .white]
 
@@ -185,6 +188,21 @@ struct EditorView: View {
             .frame(width: 76)
             .help("Text size")
 
+            Divider().frame(height: 22).padding(.horizontal, 4)
+
+            Button { showBackground.toggle() } label: {
+                Image(systemName: "rectangle.on.rectangle.angled")
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 32, height: 28)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(backgroundActive ? Color.accentColor.opacity(0.22) : .clear))
+                    .foregroundStyle(backgroundActive ? Color.accentColor : .primary)
+            }
+            .buttonStyle(.plain)
+            .help("Background & padding")
+            .popover(isPresented: $showBackground, arrowEdge: .bottom) {
+                BackgroundInspector(document: document)
+            }
+
             Spacer()
 
             Button { document.undo() } label: { Image(systemName: "arrow.uturn.backward") }
@@ -203,6 +221,11 @@ struct EditorView: View {
                 .buttonStyle(.borderedProminent)
                 .help("Save to \(Preferences.saveDirectory.lastPathComponent) and close")
         }
+    }
+
+    /// Highlights the Background button while the popover is open or a background/padding is in effect.
+    private var backgroundActive: Bool {
+        showBackground || document.backgroundStyle.kind != .none || document.backgroundStyle.padding > 0
     }
 
     private func setColor(_ c: NSColor) {
