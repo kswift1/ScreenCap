@@ -77,6 +77,31 @@ ScreenCap/
 - ScreenCap의 모든 창은 `SCContentFilter`에서 제외되므로 오버레이, 녹화 프레임, 녹화 컨트롤이 결과물에 찍히지 않습니다.
 - 주석은 화면 캔버스와 내보내기 이미지 모두 하나의 Core Graphics 코드(`AnnotationRenderer`)로 그립니다. 좌표는 y가 아래로 증가하는 이미지 픽셀 기준입니다.
 
+## 릴리스
+
+### 릴리스 설치하기
+
+1. [Releases 페이지](https://github.com/kswift1/ScreenCap/releases)에서 `ScreenCap-<version>.dmg`를 내려받습니다. 같은 앱의 `.zip`과 SHA-256 체크섬도 함께 올라갑니다.
+2. dmg를 열고 **ScreenCap**을 옆에 있는 **Applications** 바로가기로 드래그한 뒤 디스크 이미지를 추출합니다.
+3. 응용 프로그램 폴더에서 ScreenCap을 실행합니다. 릴리스는 Developer ID 인증서로 서명하고 Apple 공증(notarization)을 받았기 때문에 Gatekeeper가 우클릭 우회 없이 바로 열어 줍니다. ScreenCap은 메뉴바에만 나타납니다(Dock 아이콘 없음).
+4. 첫 캡처 때 macOS가 **화면 녹화** 권한을 요청합니다. 시스템 설정 → 개인정보 보호 및 보안 → 화면 및 시스템 오디오 녹음에서 허용한 뒤 ScreenCap을 종료하고 다시 실행하세요. 마이크를 켜고 녹화하면 마이크 권한도 같은 방식으로 요청합니다.
+
+### 릴리스 만들기 (메인테이너)
+
+`scripts/release.sh`가 빌드·서명·공증·패키징을 한 번에 처리합니다. Xcode 명령줄 도구, 키체인에 들어 있는 **Developer ID Application** 인증서, 그리고 `scripts/local.env`(git 제외, `scripts/local.env.example`을 복사해서 시작)의 두 키가 필요합니다.
+
+| 키 | 의미 |
+| --- | --- |
+| `DEVELOPMENT_TEAM` | Developer ID 인증서를 소유한 팀 ID (`security find-identity -v -p codesigning`으로 확인). |
+| `NOTARY_PROFILE` | `notarytool` 키체인 프로필 이름. `xcrun notarytool store-credentials "<이름>" --apple-id … --team-id … --password <앱 암호>`로 한 번만 만들어 둡니다. |
+
+```sh
+scripts/release.sh 1.2.0 --dry-run   # 빌드 + 서명 + zip + dmg까지만. 공증·커밋·태그 없음
+scripts/release.sh 1.2.0             # 실제 릴리스
+```
+
+스크립트는 semver를 검증하고 `project.yml`의 `CFBundleShortVersionString`을 설정하며 `CFBundleVersion`을 1 올린 뒤, Developer ID 아이덴티티·hardened runtime·보안 타임스탬프로 Release를 빌드합니다. 이어서 앱을 zip으로 묶어(`ditto`) `notarytool --wait`로 제출하고 티켓을 스테이플하며, dmg(앱 + Applications 심볼릭 링크, 볼륨 이름 "ScreenCap")를 만들어 서명·공증·스테이플하고, SHA-256 합계와 이전 태그 이후의 git log로 채운 `RELEASE_NOTES.md` 초안을 `dist/`에 씁니다. 마지막으로 버전 변경을 커밋하고 주석 태그 `v<version>`을 만들며(이미 있으면 중단), 노트를 다듬은 뒤 실행할 `git push`와 `gh release create … --notes-file dist/RELEASE_NOTES.md` 명령을 출력합니다. 실제 실행은 작업 트리가 깨끗하지 않으면 시작하지 않고, `--dry-run`은 경고만 하고 끝날 때 `project.yml`을 원래대로 되돌립니다. 평소의 `scripts/build.sh` / `run.sh` 빌드는 그대로 ad-hoc 서명입니다.
+
 ## 라이선스
 
 MIT — [LICENSE](LICENSE) 참고.

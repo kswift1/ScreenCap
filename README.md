@@ -77,6 +77,31 @@ Design notes:
 - Every ScreenCap window is excluded from the `SCContentFilter`, so the overlay, frame, and recording controls never appear in the output.
 - Annotations are rendered by one Core Graphics code path (`AnnotationRenderer`) for both the live canvas and the exported image, in y-down image-pixel coordinates.
 
+## Releases
+
+### Installing a release
+
+1. Download `ScreenCap-<version>.dmg` from the [Releases page](https://github.com/kswift1/ScreenCap/releases) (a `.zip` of the same app and SHA-256 checksums are attached too).
+2. Open the dmg and drag **ScreenCap** onto the **Applications** shortcut next to it, then eject the disk image.
+3. Launch ScreenCap from Applications. Releases are signed with a Developer ID certificate and notarized by Apple, so Gatekeeper opens them without any right-click workaround. ScreenCap lives in the menu bar (there is no Dock icon).
+4. On first capture, macOS asks for **Screen Recording** permission. Allow it in System Settings → Privacy & Security → Screen & System Audio Recording, then quit and relaunch ScreenCap. Recording with a microphone asks for Microphone permission the same way.
+
+### Cutting a release (maintainers)
+
+`scripts/release.sh` builds, signs, notarizes and packages a release in one go. It needs the Xcode command line tools, a **Developer ID Application** certificate in your keychain, and two keys in `scripts/local.env` (git-ignored; start from `scripts/local.env.example`):
+
+| Key | Meaning |
+| --- | --- |
+| `DEVELOPMENT_TEAM` | Team ID that owns the Developer ID certificate (`security find-identity -v -p codesigning` lists it). |
+| `NOTARY_PROFILE` | Name of a `notarytool` keychain profile, created once with `xcrun notarytool store-credentials "<name>" --apple-id … --team-id … --password <app-specific password>`. |
+
+```sh
+scripts/release.sh 1.2.0 --dry-run   # build + sign + zip + dmg only; no notarization, commit or tag
+scripts/release.sh 1.2.0             # the real thing
+```
+
+The script validates the semver, sets `CFBundleShortVersionString` and bumps `CFBundleVersion` in `project.yml`, builds Release with the Developer ID identity, hardened runtime and a secure timestamp, zips the app (`ditto`), submits it with `notarytool --wait`, staples the ticket, builds a dmg (app + Applications symlink, volume "ScreenCap"), signs, notarizes and staples the dmg, and writes SHA-256 sums plus a `RELEASE_NOTES.md` skeleton (git log since the previous tag) into `dist/`. It then commits the version bump, creates the annotated tag `v<version>` (aborting if it already exists), and prints the `git push` and `gh release create … --notes-file dist/RELEASE_NOTES.md` commands for you to run after editing the notes. A real run refuses to start on a dirty working tree; `--dry-run` only warns and restores `project.yml` when it finishes. Normal `scripts/build.sh` / `run.sh` builds stay ad-hoc signed and are unaffected.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

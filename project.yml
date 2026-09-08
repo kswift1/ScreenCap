@@ -40,6 +40,8 @@ targets:
       path: ScreenCap/ScreenCap.entitlements
       properties:
         com.apple.security.app-sandbox: false
+        # Required under the hardened runtime (release builds) for microphone recording.
+        com.apple.security.device.audio-input: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.sungwon.ScreenCap
