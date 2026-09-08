@@ -145,6 +145,7 @@ struct QuickAccessCard: View {
             actionButton("square.and.arrow.down", "Save to \(Preferences.saveDirectory.lastPathComponent)") { controller.save(item) }
             if item.isImage {
                 actionButton("pencil.tip.crop.circle", "Annotate") { controller.annotate(item) }
+                actionButton("pin", "Pin on screen") { controller.pin(item) }
             }
             if item.isVideo {
                 actionButton("photo.stack", "Convert to GIF") { controller.convertToGIF(item) }
@@ -178,7 +179,10 @@ struct QuickAccessCard: View {
         Button("Save") { controller.save(item) }
         Button("Save As…") { controller.saveAs(item) }
         Divider()
-        if item.isImage { Button("Annotate") { controller.annotate(item) } }
+        if item.isImage {
+            Button("Annotate") { controller.annotate(item) }
+            Button("Pin on Screen") { controller.pin(item) }
+        }
         if item.isVideo { Button("Convert to GIF") { controller.convertToGIF(item) } }
         Button("Open") { controller.openExternally(item) }
         Button("Show in Finder") { controller.revealInFinder(item) }

@@ -14,6 +14,8 @@ final class CaptureItem: ObservableObject, Identifiable {
     let kind: Kind
     let createdAt: Date
     let pixelScale: CGFloat
+    /// Where on screen (Cocoa coordinates) the image was captured from, if known.
+    var sourceRect: CGRect?
     /// Current on-disk location (temp folder until saved).
     @Published var url: URL
     @Published var savedURL: URL?

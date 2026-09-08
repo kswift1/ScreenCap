@@ -13,6 +13,7 @@ final class CaptureCoordinator {
         case .captureFullscreen: captureFullscreen()
         case .captureArea: startSelection(mode: .area)
         case .captureWindow: startSelection(mode: .window)
+        case .pinArea: startSelection(mode: .pin)
         case .toggleRecording: toggleRecording()
         case .openLastCapture: QuickAccessController.shared.showLast()
         }
@@ -27,7 +28,7 @@ final class CaptureCoordinator {
         Task {
             do {
                 let image = try await CaptureEngine.captureDisplay(screen)
-                finish(image: image, pixelScale: screen.backingScaleFactor)
+                finish(image: image, pixelScale: screen.backingScaleFactor, sourceRect: screen.frame)
             } catch {
                 ErrorPresenter.show(error, title: "Capture failed")
             }
@@ -77,7 +78,11 @@ final class CaptureCoordinator {
                 Task {
                     do {
                         let image = try await CaptureEngine.captureDisplay(screen, rect: rect)
-                        finish(image: image, pixelScale: screen.backingScaleFactor)
+                        if mode == .pin {
+                            pin(image: image, pixelScale: screen.backingScaleFactor, at: rect.intersection(screen.frame))
+                        } else {
+                            finish(image: image, pixelScale: screen.backingScaleFactor, sourceRect: rect)
+                        }
                     } catch {
                         ErrorPresenter.show(error, title: "Capture failed")
                     }
@@ -99,7 +104,11 @@ final class CaptureCoordinator {
                             // Fall back to a display crop if the window vanished from SCK's list.
                             image = try await CaptureEngine.captureDisplay(screen, rect: info.frame)
                         }
-                        finish(image: image, pixelScale: screen.backingScaleFactor)
+                        if mode == .pin {
+                            pin(image: image, pixelScale: screen.backingScaleFactor, at: info.frame)
+                        } else {
+                            finish(image: image, pixelScale: screen.backingScaleFactor, sourceRect: info.frame)
+                        }
                     } catch {
                         ErrorPresenter.show(error, title: "Capture failed")
                     }
@@ -110,9 +119,10 @@ final class CaptureCoordinator {
 
     // MARK: Post-capture
 
-    func finish(image: CGImage, pixelScale: CGFloat) {
+    func finish(image: CGImage, pixelScale: CGFloat, sourceRect: CGRect? = nil) {
         do {
             let item = try CaptureItem(image: image, pixelScale: pixelScale)
+            item.sourceRect = sourceRect
             SoundPlayer.playCapture()
             if Preferences.copyToClipboard {
                 Clipboard.copy(image: image, pixelScale: pixelScale)
@@ -120,6 +130,19 @@ final class CaptureCoordinator {
             publish(item)
         } catch {
             ErrorPresenter.show(error, title: "Couldn't save capture")
+        }
+    }
+
+    /// Pin flow: the capture floats above everything at the spot it was taken from. Nothing else happens.
+    func pin(image: CGImage, pixelScale: CGFloat, at rect: CGRect) {
+        do {
+            let item = try CaptureItem(image: image, pixelScale: pixelScale)
+            item.sourceRect = rect
+            history.append(item)
+            SoundPlayer.playCapture()
+            PinController.shared.pin(item, at: rect)
+        } catch {
+            ErrorPresenter.show(error, title: "Couldn't pin capture")
         }
     }
 

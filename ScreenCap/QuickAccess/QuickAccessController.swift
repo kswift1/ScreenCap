@@ -113,6 +113,12 @@ final class QuickAccessController: ObservableObject {
         EditorWindowController.open(image: image, pixelScale: item.pixelScale, sourceItem: item)
     }
 
+    func pin(_ item: CaptureItem) {
+        guard item.isImage else { return }
+        remove(item)
+        PinController.shared.pin(item, at: item.sourceRect)
+    }
+
     func openExternally(_ item: CaptureItem) {
         NSWorkspace.shared.open(item.savedURL ?? item.url)
     }

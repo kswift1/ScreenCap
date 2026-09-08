@@ -64,6 +64,13 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         HotkeyManager.shared.binding(for: .openLastCapture)?.apply(to: last)
         menu.addItem(last)
 
+        if !PinController.shared.pins.isEmpty {
+            let close = NSMenuItem(title: "Close All Pins (\(PinController.shared.pins.count))", action: #selector(closePins(_:)), keyEquivalent: "")
+            close.target = self
+            close.image = NSImage(systemSymbolName: "pin.slash", accessibilityDescription: nil)
+            menu.addItem(close)
+        }
+
         let folder = NSMenuItem(title: "Open Captures Folder", action: #selector(openFolder(_:)), keyEquivalent: "")
         folder.target = self
         folder.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
@@ -84,6 +91,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             CaptureCoordinator.shared.perform(action)
         }
+    }
+
+    @objc private func closePins(_ sender: Any?) {
+        PinController.shared.closeAll()
     }
 
     @objc private func openFolder(_ sender: Any?) {

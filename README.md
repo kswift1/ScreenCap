@@ -5,6 +5,7 @@ A CleanShot X–inspired screenshot and screen recording app for macOS, written 
 ## Features
 
 - **Capture** — fullscreen, area (drag), or window (hover + click) from the menu bar or global hotkeys. The front app keeps focus, so windows look normal in the shot. Retina-aware, cursor optional.
+- **Pin** — ⇧⌘4 grabs an area (or window) and leaves it floating above every app and Space, right where it was. Drag it aside, resize from the edges, scroll to change opacity, Esc or ✕ to close. Handy for keeping a chat or spec in view while you work.
 - **Quick Access overlay** — captures stack up in the bottom-left corner. Hover for Copy / Save / Annotate / GIF, drag the thumbnail straight into another app, or let it auto-dismiss.
 - **Annotation editor** — arrow, line, rectangle, ellipse, pen, highlighter, text, pixelate, and numbered counters. Undo/redo, move with the select tool, single-key tool shortcuts (A, L, R, O, P, H, T, B, N, V).
 - **Screen recording** — record any area or window to H.264 `.mp4` (optionally with system audio), then convert to a looping GIF from Quick Access.
@@ -16,8 +17,9 @@ Default shortcuts (change them in Settings → Shortcuts):
 | Capture Fullscreen | ⇧⌘1 |
 | Capture Area | ⇧⌘2 |
 | Capture Window | ⇧⌘3 |
-| Record Screen (start/stop) | ⇧⌘4 |
-| Open Last Capture | ⇧⌘5 |
+| Pin Area (floating reference) | ⇧⌘4 |
+| Record Screen (start/stop) | ⇧⌘5 |
+| Open Last Capture | ⇧⌘6 |
 
 ⇧⌘3/4/5 are also macOS's built-in screenshot shortcuts, which take priority. Turn them off in System Settings → Keyboard → Keyboard Shortcuts → Screenshots (the Shortcuts tab in ScreenCap warns you and links there).
 

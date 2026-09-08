@@ -62,6 +62,7 @@ enum HotkeyAction: String, CaseIterable, Codable, Identifiable {
     case captureFullscreen
     case captureArea
     case captureWindow
+    case pinArea
     case toggleRecording
     case openLastCapture
 
@@ -72,6 +73,7 @@ enum HotkeyAction: String, CaseIterable, Codable, Identifiable {
         case .captureFullscreen: return "Capture Fullscreen"
         case .captureArea: return "Capture Area"
         case .captureWindow: return "Capture Window"
+        case .pinArea: return "Pin Area"
         case .toggleRecording: return "Record Screen"
         case .openLastCapture: return "Open Last Capture"
         }
@@ -82,6 +84,7 @@ enum HotkeyAction: String, CaseIterable, Codable, Identifiable {
         case .captureFullscreen: return "macwindow"
         case .captureArea: return "rectangle.dashed"
         case .captureWindow: return "macwindow.on.rectangle"
+        case .pinArea: return "pin"
         case .toggleRecording: return "record.circle"
         case .openLastCapture: return "clock.arrow.circlepath"
         }
@@ -93,8 +96,9 @@ enum HotkeyAction: String, CaseIterable, Codable, Identifiable {
         case .captureFullscreen: return Hotkey(keyCode: UInt32(kVK_ANSI_1), carbonModifiers: shiftCmd)
         case .captureArea: return Hotkey(keyCode: UInt32(kVK_ANSI_2), carbonModifiers: shiftCmd)
         case .captureWindow: return Hotkey(keyCode: UInt32(kVK_ANSI_3), carbonModifiers: shiftCmd)
-        case .toggleRecording: return Hotkey(keyCode: UInt32(kVK_ANSI_4), carbonModifiers: shiftCmd)
-        case .openLastCapture: return Hotkey(keyCode: UInt32(kVK_ANSI_5), carbonModifiers: shiftCmd)
+        case .pinArea: return Hotkey(keyCode: UInt32(kVK_ANSI_4), carbonModifiers: shiftCmd)
+        case .toggleRecording: return Hotkey(keyCode: UInt32(kVK_ANSI_5), carbonModifiers: shiftCmd)
+        case .openLastCapture: return Hotkey(keyCode: UInt32(kVK_ANSI_6), carbonModifiers: shiftCmd)
         }
     }
 }
