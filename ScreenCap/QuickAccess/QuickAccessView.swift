@@ -56,6 +56,7 @@ struct QuickAccessCard: View {
                         .foregroundStyle(.white, .black.opacity(0.7))
                 }
                 .buttonStyle(.plain)
+                .help("Dismiss (⌫)")
                 .offset(x: -6, y: -6)
             }
 
@@ -139,20 +140,22 @@ struct QuickAccessCard: View {
             .foregroundStyle(.white)
     }
 
+    /// Hover buttons. Each shows its single-key shortcut as a caption; the same keys work while hovering.
     private var actionBar: some View {
         HStack(spacing: 4) {
-            actionButton("doc.on.doc", "Copy") { controller.copy(item) }
-            actionButton("square.and.arrow.down", "Save to \(Preferences.saveDirectory.lastPathComponent)") { controller.save(item) }
+            actionButton("doc.on.doc", "Copy", key: "C") { controller.copy(item) }
+            actionButton("square.and.arrow.down", "Save to \(Preferences.saveDirectory.lastPathComponent)", key: "S",
+                         extraHelp: "⇧S: Save As…") { controller.save(item) }
             if item.isImage {
-                actionButton("pencil.tip.crop.circle", "Annotate") { controller.annotate(item) }
-                actionButton("pin", "Pin on screen") { controller.pin(item) }
+                actionButton("pencil.tip.crop.circle", "Annotate", key: "E") { controller.annotate(item) }
+                actionButton("pin", "Pin on screen", key: "P") { controller.pin(item) }
             }
             if item.isVideo {
-                actionButton("photo.stack", "Convert to GIF") { controller.convertToGIF(item) }
-                actionButton("play.rectangle", "Open") { controller.openExternally(item) }
+                actionButton("photo.stack", "Convert to GIF", key: "G") { controller.convertToGIF(item) }
+                actionButton("play.rectangle", "Open", key: "O") { controller.openExternally(item) }
             }
             if item.kind.isGIF {
-                actionButton("arrow.up.forward.app", "Open") { controller.openExternally(item) }
+                actionButton("arrow.up.forward.app", "Open", key: "O") { controller.openExternally(item) }
             }
         }
         .padding(4)
@@ -162,32 +165,40 @@ struct QuickAccessCard: View {
         .transition(.opacity)
     }
 
-    private func actionButton(_ symbol: String, _ help: String, action: @escaping () -> Void) -> some View {
+    /// An icon button with its shortcut key captioned beneath; `extraHelp` adds a second line to the tooltip.
+    private func actionButton(_ symbol: String, _ help: String, key: String, extraHelp: String? = nil,
+                              action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .medium))
-                .frame(width: 30, height: 26)
-                .contentShape(Rectangle())
+            VStack(spacing: 1) {
+                Image(systemName: symbol)
+                    .font(.system(size: 13, weight: .medium))
+                Text(key)
+                    .font(.system(size: 8, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: 30, height: 32)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(help)
+        .help([help + " (\(key))", extraHelp].compactMap { $0 }.joined(separator: "\n"))
     }
 
     @ViewBuilder
     private var menu: some View {
-        Button("Copy") { controller.copy(item) }
-        Button("Save") { controller.save(item) }
-        Button("Save As…") { controller.saveAs(item) }
+        Button("Copy") { controller.copy(item) }.keyboardShortcut("c", modifiers: [])
+        Button("Save") { controller.save(item) }.keyboardShortcut("s", modifiers: [])
+        Button("Save As…") { controller.saveAs(item) }.keyboardShortcut("s", modifiers: .shift)
         Divider()
         if item.isImage {
-            Button("Annotate") { controller.annotate(item) }
-            Button("Pin on Screen") { controller.pin(item) }
+            Button("Annotate") { controller.annotate(item) }.keyboardShortcut("e", modifiers: [])
+            Button("Pin on Screen") { controller.pin(item) }.keyboardShortcut("p", modifiers: [])
         }
-        if item.isVideo { Button("Convert to GIF") { controller.convertToGIF(item) } }
-        Button("Open") { controller.openExternally(item) }
-        Button("Show in Finder") { controller.revealInFinder(item) }
+        if item.isVideo { Button("Convert to GIF") { controller.convertToGIF(item) }.keyboardShortcut("g", modifiers: []) }
+        Button("Open") { controller.openExternally(item) }.keyboardShortcut("o", modifiers: [])
+        Button("Show in Finder") { controller.revealInFinder(item) }.keyboardShortcut("f", modifiers: [])
         Divider()
-        Button("Dismiss") { controller.remove(item) }
+        Button("Dismiss") { controller.remove(item) }.keyboardShortcut(.delete, modifiers: [])
+        Button("Dismiss All") { controller.removeAll() }.keyboardShortcut(.delete, modifiers: .command)
     }
 }
 
