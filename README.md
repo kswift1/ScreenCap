@@ -1,5 +1,7 @@
 # ScreenCap
 
+**English** · [한국어](README.ko.md)
+
 A CleanShot X–inspired screenshot and screen recording app for macOS, written in Swift (AppKit + SwiftUI) on top of ScreenCaptureKit.
 
 ## Features
@@ -54,13 +56,13 @@ ScreenCap.app/Contents/MacOS/ScreenCap --debug-overlay                    # show
 ```
 ScreenCap/
   App/          entry point, app delegate, menu bar item, main menu
-  Capture/      ScreenCaptureKit engine, window enumeration, selection overlay, coordinator
+  Capture/      ScreenCaptureKit engine, window enumeration, selection overlay, coordinator, pin windows
   Recording/    SCStream recorder, on-screen recording controls, GIF export
   QuickAccess/  bottom-left thumbnail stack (NSPanel + SwiftUI)
   Editor/       annotation model, shared CG renderer, AppKit canvas, editor window
   Settings/     UserDefaults-backed preferences and the Settings window
   Hotkeys/      Carbon RegisterEventHotKey wrapper and recorder UI
-  Support/      file store, clipboard, permissions, extensions
+  Support/      file store, clipboard, permissions, OCR, extensions
 ```
 
 Design notes:

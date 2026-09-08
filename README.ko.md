@@ -1,0 +1,72 @@
+# ScreenCap
+
+[English](README.md) · **한국어**
+
+CleanShot X를 벤치마킹한 macOS용 스크린샷·화면 녹화 앱입니다. Swift(AppKit + SwiftUI)와 ScreenCaptureKit으로 만들었습니다.
+
+## 기능
+
+- **캡처** — 메뉴바나 전역 단축키로 전체 화면, 영역(드래그), 윈도우(호버 후 클릭)를 캡처합니다. 앞에 있는 앱의 포커스를 빼앗지 않아 캡처된 창이 비활성 상태로 흐려지지 않습니다. Retina 대응, 마우스 커서 포함 여부 선택 가능.
+- **All-in-One** — ⇧⌘8로 오버레이 하나를 띄우고 하단 툴바(Area · Window · Fullscreen · Pin · Record · Text)에서 모드를 바꿉니다. 클릭 또는 A/W/F/P/R/T 키(또는 1~6)로 전환하며, 마지막에 쓴 모드를 기억합니다.
+- **OCR** — ⇧⌘7로 텍스트 위를 드래그하면(또는 윈도우를 클릭하면) 줄바꿈을 유지한 일반 텍스트로 클립보드에 복사됩니다. 한국어·영어·일본어·중국어를 인식하고, QR 코드도 읽어 URL이면 Open 버튼을 보여줍니다.
+- **핀** — ⇧⌘4로 영역(또는 윈도우)을 캡처하면 그 자리에 모든 앱과 Space 위에 떠 있는 고정 창이 됩니다. 채팅이나 문서를 옆에 두고 참고할 때 유용합니다. 드래그로 이동, 가장자리에서 크기 조절, 스크롤로 투명도 조절, Esc 또는 ✕로 닫기. 잠금(⌘L 또는 메뉴)을 걸면 클릭이 통과되고 움직이지 않습니다. ⌘+스크롤이나 핀치로 25~400% 확대·축소, 더블클릭으로 원래 크기, 화살표 키로 미세 이동, ⇧⌘9로 모든 핀 숨기기/표시. 메뉴바의 Pins 서브메뉴에서 목록 확인, 잠금 해제, 마지막에 닫은 핀 다시 열기가 됩니다.
+- **Quick Access 오버레이** — 캡처 결과가 화면 좌하단에 쌓입니다. 호버하면 복사 / 저장 / 주석 / 핀 / GIF 버튼이 나오고, 썸네일을 다른 앱으로 바로 드래그할 수 있으며, 그대로 두면 자동으로 사라집니다. 카드 위에서 키 하나로 동작합니다: C 복사, S 저장, ⇧S 다른 이름으로 저장, E 주석, P 핀, G GIF, O 열기, F Finder에서 보기, ⌫ 닫기, ⌘⌫ 모두 닫기.
+- **주석 편집기** — 화살표, 선, 사각형, 원, 펜, 형광펜, 텍스트, 픽셀화(모자이크), 번호 카운터. 실행 취소/다시 실행, 선택 도구로 이동, 도구 단축키(A, L, R, O, P, H, T, B, N, V).
+- **화면 녹화** — 영역이나 윈도우를 H.264 `.mp4`로 녹화하고(시스템 오디오 선택 가능), Quick Access에서 반복 재생 GIF로 변환합니다.
+
+기본 단축키 (설정 → Shortcuts에서 변경):
+
+| 동작 | 단축키 |
+| --- | --- |
+| 전체 화면 캡처 | ⇧⌘1 |
+| 영역 캡처 | ⇧⌘2 |
+| 윈도우 캡처 | ⇧⌘3 |
+| 영역 핀 고정 (참고용 플로팅 창) | ⇧⌘4 |
+| 화면 녹화 (시작/정지) | ⇧⌘5 |
+| 마지막 캡처 열기 | ⇧⌘6 |
+| 텍스트 복사 (OCR) | ⇧⌘7 |
+| All-in-One | ⇧⌘8 |
+| 핀 숨기기/표시 | ⇧⌘9 |
+
+⇧⌘3/4/5는 macOS 기본 스크린샷 단축키와 겹치며 시스템 쪽이 우선합니다. 시스템 설정 → 키보드 → 키보드 단축키 → 스크린샷에서 꺼 주세요. ScreenCap의 Shortcuts 탭이 충돌을 감지해 경고하고 해당 설정 화면으로 연결해 줍니다.
+
+## 요구 사항
+
+- macOS 15 (Sequoia) 이상 — `SCScreenshotManager`, `SCRecordingOutput`을 사용합니다.
+- Xcode 26, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
+- 화면 녹화 권한 (시스템 설정 → 개인정보 보호 및 보안 → 화면 및 시스템 오디오 녹음). 권한을 켠 뒤 앱을 다시 실행하세요.
+
+## 빌드 및 실행
+
+```sh
+./scripts/run.sh          # xcodegen + xcodebuild (Debug) + 실행
+```
+
+`scripts/build.sh`는 빌드만 합니다. `.app`은 `build/Build/Products/Debug/`에 생성됩니다. Xcode에서 작업하려면 `xcodegen generate`를 실행한 뒤 `ScreenCap.xcodeproj`를 여세요. 프로젝트 파일은 git에서 제외되어 있고 `project.yml`이 원본입니다.
+
+개발용 실행 인자:
+
+```sh
+ScreenCap.app/Contents/MacOS/ScreenCap --open-editor path/to/image.png   # 주석 편집기를 바로 열기
+ScreenCap.app/Contents/MacOS/ScreenCap --debug-overlay                    # 선택 오버레이를 띄우고 결과를 로그로 출력
+```
+
+## 프로젝트 구조
+
+```
+ScreenCap/
+  App/          진입점, 앱 델리게이트, 메뉴바 아이템, 메인 메뉴
+  Capture/      ScreenCaptureKit 엔진, 윈도우 목록, 선택 오버레이, 코디네이터, 핀 창
+  Recording/    SCStream 녹화기, 화면 위 녹화 컨트롤, GIF 내보내기
+  QuickAccess/  좌하단 썸네일 스택 (NSPanel + SwiftUI)
+  Editor/       주석 모델, 공용 CG 렌더러, AppKit 캔버스, 편집기 창
+  Settings/     UserDefaults 기반 환경설정과 설정 창
+  Hotkeys/      Carbon RegisterEventHotKey 래퍼와 단축키 녹화 UI
+  Support/      파일 저장, 클립보드, 권한, OCR, 확장
+```
+
+설계 메모:
+
+- 오버레이와 Quick Access는 **non-activating `NSPanel`** 이라 ScreenCap이 포커스를 가져가지 않고, 캡처 대상 앱이 흐려지지 않습니다.
+- ScreenCap의 모든 창은 `SCContentFilter`에서 제외되므로 오버레이, 녹화 프레임, 녹화 컨트롤이 결과물에 찍히지 않습니다.
+- 주석은 화면 캔버스와 내보내기 이미지 모두 하나의 Core Graphics 코드(`AnnotationRenderer`)로 그립니다. 좌표는 y가 아래로 증가하는 이미지 픽셀 기준입니다.
