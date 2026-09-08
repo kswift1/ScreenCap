@@ -32,10 +32,12 @@ final class RecordingFramePanel: NSPanel {
     }
 }
 
-/// Small floating pill with a timer and Stop/Cancel buttons, docked at the bottom of the display.
+/// Small floating pill with a timer and Pause/Stop/Cancel buttons, docked at the bottom of the display.
 final class RecordingControlsPanel: NSPanel {
+    static let size = CGSize(width: 268, height: 44)
+
     init(recorder: ScreenRecorder, screen: NSScreen) {
-        let size = CGSize(width: 232, height: 44)
+        let size = Self.size
         let origin = CGPoint(x: screen.visibleFrame.midX - size.width / 2, y: screen.visibleFrame.minY + 24)
         super.init(contentRect: CGRect(origin: origin, size: size), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         level = .screenSaver
@@ -58,10 +60,7 @@ struct RecordingControlsView: View {
         HStack(spacing: 10) {
             TimelineView(.periodic(from: .now, by: 0.5)) { context in
                 HStack(spacing: 8) {
-                    Circle()
-                        .fill(.red)
-                        .frame(width: 10, height: 10)
-                        .opacity(Int(context.date.timeIntervalSinceReferenceDate * 2) % 2 == 0 ? 1 : 0.35)
+                    indicator(at: context.date)
                     Text(elapsed(at: context.date))
                         .font(.system(size: 14, weight: .semibold, design: .monospaced))
                         .foregroundStyle(.white)
@@ -71,6 +70,16 @@ struct RecordingControlsView: View {
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.6))
             Spacer(minLength: 0)
+            Button { Task { await recorder.togglePause() } } label: {
+                Image(systemName: recorder.state.isPaused ? "play.fill" : "pause.fill")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .frame(width: 24, height: 24)
+                    .background(Circle().fill(.white.opacity(0.15)))
+            }
+            .buttonStyle(.plain)
+            .disabled(!recorder.state.canPauseOrResume)
+            .help(recorder.state.isPaused ? "Resume recording" : "Pause recording")
             Button { Task { await recorder.stop(discard: true) } } label: {
                 Image(systemName: "trash")
                     .foregroundStyle(.white.opacity(0.8))
@@ -85,17 +94,34 @@ struct RecordingControlsView: View {
                     .background(Circle().fill(.red))
             }
             .buttonStyle(.plain)
+            .disabled(!recorder.state.canPauseOrResume)
             .help("Stop recording")
         }
         .padding(.leading, 14)
         .padding(.trailing, 8)
-        .frame(width: 232, height: 44)
+        .frame(width: RecordingControlsPanel.size.width, height: RecordingControlsPanel.size.height)
         .background(Capsule().fill(Color.black.opacity(0.82)))
         .overlay(Capsule().stroke(.white.opacity(0.15)))
     }
 
+    /// Blinking red dot while recording; a steady pause glyph while paused.
+    @ViewBuilder
+    private func indicator(at date: Date) -> some View {
+        if recorder.state.isPaused {
+            Image(systemName: "pause.fill")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.yellow)
+                .frame(width: 10, height: 10)
+        } else {
+            Circle()
+                .fill(.red)
+                .frame(width: 10, height: 10)
+                .opacity(Int(date.timeIntervalSinceReferenceDate * 2) % 2 == 0 ? 1 : 0.35)
+        }
+    }
+
     private func elapsed(at date: Date) -> String {
-        let seconds = Int(date.timeIntervalSince(recorder.state.startDate ?? date))
+        let seconds = Int(recorder.elapsed(at: date))
         return String(format: "%02d:%02d", seconds / 60, seconds % 60)
     }
 }

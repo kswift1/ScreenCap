@@ -15,6 +15,9 @@ enum Preferences {
         static let recordCursor = "recordCursor"
         static let recordAudio = "recordAudio"
         static let recordFPS = "recordFPS"
+        static let recordCountdown = "recordCountdown"
+        static let recordMicrophone = "recordMicrophone"
+        static let recordClickHighlight = "recordClickHighlight"
         static let gifFPS = "gifFPS"
         static let gifMaxWidth = "gifMaxWidth"
         static let hasLaunchedBefore = "hasLaunchedBefore"
@@ -36,6 +39,9 @@ enum Preferences {
         static let recordCursor = true
         static let recordAudio = false
         static let recordFPS = 30
+        static let recordCountdown = 0
+        static let recordMicrophone = false
+        static let recordClickHighlight = false
         static let gifFPS = 10
         static let gifMaxWidth = 800
     }
@@ -55,6 +61,9 @@ enum Preferences {
             Key.recordCursor: Default.recordCursor,
             Key.recordAudio: Default.recordAudio,
             Key.recordFPS: Default.recordFPS,
+            Key.recordCountdown: Default.recordCountdown,
+            Key.recordMicrophone: Default.recordMicrophone,
+            Key.recordClickHighlight: Default.recordClickHighlight,
             Key.gifFPS: Default.gifFPS,
             Key.gifMaxWidth: Default.gifMaxWidth,
         ])
@@ -76,6 +85,10 @@ enum Preferences {
     static var recordCursor: Bool { d.bool(forKey: Key.recordCursor) }
     static var recordAudio: Bool { d.bool(forKey: Key.recordAudio) }
     static var recordFPS: Int { max(1, d.integer(forKey: Key.recordFPS)) }
+    /// Seconds shown before a recording starts; 0 disables the countdown.
+    static var recordCountdown: Int { max(0, d.integer(forKey: Key.recordCountdown)) }
+    static var recordMicrophone: Bool { d.bool(forKey: Key.recordMicrophone) }
+    static var recordClickHighlight: Bool { d.bool(forKey: Key.recordClickHighlight) }
     static var gifFPS: Int { max(1, d.integer(forKey: Key.gifFPS)) }
     static var gifMaxWidth: Int { max(100, d.integer(forKey: Key.gifMaxWidth)) }
 

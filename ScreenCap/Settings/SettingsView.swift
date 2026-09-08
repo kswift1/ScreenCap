@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 import ServiceManagement
 import Carbon.HIToolbox
 
@@ -152,8 +153,12 @@ struct RecordingSettings: View {
     @AppStorage(Preferences.Key.recordFPS) private var recordFPS = Preferences.Default.recordFPS
     @AppStorage(Preferences.Key.recordCursor) private var recordCursor = Preferences.Default.recordCursor
     @AppStorage(Preferences.Key.recordAudio) private var recordAudio = Preferences.Default.recordAudio
+    @AppStorage(Preferences.Key.recordCountdown) private var recordCountdown = Preferences.Default.recordCountdown
+    @AppStorage(Preferences.Key.recordMicrophone) private var recordMicrophone = Preferences.Default.recordMicrophone
+    @AppStorage(Preferences.Key.recordClickHighlight) private var recordClickHighlight = Preferences.Default.recordClickHighlight
     @AppStorage(Preferences.Key.gifFPS) private var gifFPS = Preferences.Default.gifFPS
     @AppStorage(Preferences.Key.gifMaxWidth) private var gifMaxWidth = Preferences.Default.gifMaxWidth
+    @State private var microphoneDenied = Self.isMicrophoneDenied()
 
     var body: some View {
         Form {
@@ -164,7 +169,31 @@ struct RecordingSettings: View {
                     Text("60 fps").tag(60)
                 }
                 Toggle("Show mouse cursor", isOn: $recordCursor)
+                Toggle("Highlight mouse clicks", isOn: $recordClickHighlight)
+                Picker("Countdown", selection: $recordCountdown) {
+                    Text("Off").tag(0)
+                    Text("3 seconds").tag(3)
+                    Text("5 seconds").tag(5)
+                    Text("10 seconds").tag(10)
+                }
+            }
+            Section {
                 Toggle("Record system audio", isOn: $recordAudio)
+                Toggle("Record microphone", isOn: $recordMicrophone)
+                if recordMicrophone, microphoneDenied {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        Text("Microphone access is off. Recordings will have no microphone until it's allowed.")
+                            .foregroundStyle(.secondary)
+                        Button("Open Privacy Settings") { openMicrophoneSettings() }
+                    }
+                    .font(.callout)
+                }
+            } header: {
+                Text("Audio")
+            } footer: {
+                Text("System audio and the microphone are mixed into the video file. Pause/resume splits the recording into segments that are joined when you stop.")
+                    .foregroundStyle(.secondary)
             }
             Section("GIF conversion") {
                 Picker("Frame rate", selection: $gifFPS) {
@@ -183,6 +212,21 @@ struct RecordingSettings: View {
             }
         }
         .formStyle(.grouped)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            microphoneDenied = Self.isMicrophoneDenied()
+        }
+    }
+
+    /// True once the user has explicitly refused (or policy blocks) microphone access.
+    private static func isMicrophoneDenied() -> Bool {
+        let status = AVCaptureDevice.authorizationStatus(for: .audio)
+        return status == .denied || status == .restricted
+    }
+
+    private func openMicrophoneSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+            NSWorkspace.shared.open(url)
+        }
     }
 }
 
