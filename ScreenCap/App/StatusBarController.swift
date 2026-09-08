@@ -28,8 +28,11 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             button.image = image?.withSymbolConfiguration(config)
             button.image?.isTemplate = false
         } else {
-            button.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "ScreenCap")
-            button.image?.isTemplate = true
+            // Template silhouette of the app icon (Assets.xcassets/MenuBarIcon); falls back to an SF Symbol.
+            let icon = NSImage(named: "MenuBarIcon") ?? NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "ScreenCap")
+            icon?.isTemplate = true
+            icon?.accessibilityDescription = "ScreenCap"
+            button.image = icon
         }
     }
 
