@@ -7,6 +7,8 @@ final class CaptureCoordinator {
 
     private(set) var history: [CaptureItem] = []
     private var selection: SelectionSession?
+    /// Mode the All-in-One overlay opens in: whatever was used there last (this app session only).
+    private var lastAllInOneMode: SelectionMode = .area
 
     func perform(_ action: HotkeyAction) {
         switch action {
@@ -17,7 +19,7 @@ final class CaptureCoordinator {
         case .toggleRecording: toggleRecording()
         case .openLastCapture: QuickAccessController.shared.showLast()
         case .recognizeText: startSelection(mode: .ocr)
-        case .allInOne: startSelection(mode: .area) // TODO(all-in-one): overlay with mode toolbar
+        case .allInOne: startAllInOne()
         case .togglePins: PinController.shared.toggleHidden()
         }
     }
@@ -46,17 +48,23 @@ final class CaptureCoordinator {
         }
     }
 
-    private func startSelection(mode: SelectionMode) {
+    /// All-in-One (⇧⌘8): one overlay with a mode toolbar, starting in the last mode used there.
+    private func startAllInOne() {
+        startSelection(mode: lastAllInOneMode, allowsModeSwitch: true)
+    }
+
+    private func startSelection(mode: SelectionMode, allowsModeSwitch: Bool = false) {
         guard Permissions.ensureScreenCaptureAccess() else { return }
         if selection != nil {
             // Pressing the hotkey again while selecting cancels.
             cancelSelection()
             return
         }
-        let session = SelectionSession(mode: mode) { [weak self] result in
+        let session = SelectionSession(mode: mode, allowsModeSwitch: allowsModeSwitch) { [weak self] result, finalMode in
             guard let self else { return }
             self.selection = nil
-            self.handle(result, mode: mode)
+            if allowsModeSwitch { self.lastAllInOneMode = finalMode }
+            self.handle(result, mode: finalMode)
         }
         selection = session
         session.begin()
@@ -70,11 +78,17 @@ final class CaptureCoordinator {
     // MARK: Selection results
 
     private func handle(_ result: SelectionResult, mode: SelectionMode) {
+        if mode == .record, ScreenRecorder.shared.state.isActive, !result.isCancelled {
+            // Record picked (e.g. from All-in-One) while already recording: stop instead of starting another.
+            Task { await ScreenRecorder.shared.stop() }
+            return
+        }
         switch result {
         case .cancelled:
             return
 
         case .area(let screen, let rect):
+            // `.fullscreen` arrives here as the whole display frame and is handled like any area.
             if mode == .record {
                 Task { await ScreenRecorder.shared.start(screen: screen, rect: rect) }
             } else {
@@ -175,5 +189,12 @@ final class CaptureCoordinator {
         if showQA {
             QuickAccessController.shared.add(item)
         }
+    }
+}
+
+private extension SelectionResult {
+    var isCancelled: Bool {
+        if case .cancelled = self { return true }
+        return false
     }
 }

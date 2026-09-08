@@ -46,7 +46,7 @@ extension AppDelegate {
             EditorWindowController.open(image: image, pixelScale: scale, sourceItem: nil)
         }
         if args.contains("--debug-overlay") {
-            let session = SelectionSession(mode: .area) { result in
+            let session = SelectionSession(mode: .area) { result, _ in
                 debugSelectionSession = nil
                 switch result {
                 case .area(let screen, let rect): NSLog("overlay: area %@ on display %u", NSStringFromRect(rect), screen.displayID)
