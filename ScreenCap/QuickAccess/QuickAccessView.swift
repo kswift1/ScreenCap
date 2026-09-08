@@ -4,13 +4,13 @@ struct QuickAccessView: View {
     @ObservedObject var controller: QuickAccessController
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: QuickAccessCard.cardSpacing) {
             ForEach(controller.items) { item in
                 QuickAccessCard(item: item, controller: controller)
                     .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity), removal: .opacity))
             }
         }
-        .padding(16)
+        .padding(QuickAccessCard.stackPadding)
         .fixedSize()
         .background(GeometryReader { geo in
             Color.clear.preference(key: SizeKey.self, value: geo.size)
@@ -33,11 +33,18 @@ struct QuickAccessCard: View {
 
     private let width: CGFloat = 224
 
-    private var thumbSize: CGSize {
-        guard let t = item.thumbnail, t.size.width > 0 else { return CGSize(width: width, height: width * 0.6) }
+    private var thumbSize: CGSize { QuickAccessCard.thumbSize(for: item) }
+
+    static let cardWidth: CGFloat = 224
+    static let cardSpacing: CGFloat = 12
+    static let stackPadding: CGFloat = 16
+
+    /// Card size for an item; shared with the controller so the panel can be sized deterministically.
+    static func thumbSize(for item: CaptureItem) -> CGSize {
+        guard let t = item.thumbnail, t.size.width > 0 else { return CGSize(width: cardWidth, height: cardWidth * 0.6) }
         let ratio = t.size.height / t.size.width
-        let h = min(max(width * ratio, 60), 170)
-        return CGSize(width: width, height: h)
+        let h = min(max(cardWidth * ratio, 60), 170)
+        return CGSize(width: cardWidth, height: h)
     }
 
     var body: some View {
@@ -83,6 +90,7 @@ struct QuickAccessCard: View {
             if item.isImage { controller.annotate(item) } else { controller.openExternally(item) }
         }
         .onDrag { NSItemProvider(contentsOf: item.savedURL ?? item.url) ?? NSItemProvider() }
+        .onChange(of: item.thumbnail) { _, _ in controller.layoutPanel() }
         .contextMenu { menu }
         .animation(.easeOut(duration: 0.12), value: hovering)
     }

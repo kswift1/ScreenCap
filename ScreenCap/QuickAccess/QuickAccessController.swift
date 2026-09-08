@@ -31,6 +31,7 @@ final class QuickAccessController: ObservableObject {
         withAnimation(animated ? .easeOut(duration: 0.18) : nil) {
             items.removeAll { $0.id == item.id }
         }
+        layoutPanel()
         if keyboardTarget === item {
             keyboardTarget = nil
             releaseKeyboard()
@@ -241,7 +242,8 @@ final class QuickAccessController: ObservableObject {
         if panel == nil {
             let p = QuickAccessPanel(contentRect: CGRect(x: 0, y: 0, width: 260, height: 100),
                                      styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-            p.level = .statusBar
+            // Above pins (.floating) but not status-bar level: status-bar-level windows disappear on full-screen Spaces.
+            p.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
             p.isOpaque = false
             p.backgroundColor = .clear
             p.hasShadow = false
@@ -251,8 +253,10 @@ final class QuickAccessController: ObservableObject {
             p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
             let hosting = QuickAccessHostingView(rootView: QuickAccessView(controller: self), controller: self)
             hosting.sizingOptions = []
-            p.contentView = hosting
+            // Assign before installing the content view: SwiftUI can report its size synchronously
+            // during that install, and updatePanelSize needs `panel` to be set by then.
             panel = p
+            p.contentView = hosting
         }
         guard let panel else { return }
         if !panel.isVisible {
@@ -260,6 +264,17 @@ final class QuickAccessController: ObservableObject {
             panel.setFrameOrigin(CGPoint(x: screen.visibleFrame.minX + 16, y: screen.visibleFrame.minY + 16))
         }
         panel.orderFrontRegardless()
+        layoutPanel()
+    }
+
+    /// Sizes the panel from the cards it holds (width + stacked heights). The SwiftUI preference
+    /// path also calls updatePanelSize, but this deterministic path never depends on layout timing.
+    func layoutPanel() {
+        guard !items.isEmpty else { return }
+        let pad = QuickAccessCard.stackPadding
+        let heights = items.map { QuickAccessCard.thumbSize(for: $0).height }
+        let height = heights.reduce(0, +) + CGFloat(max(items.count - 1, 0)) * QuickAccessCard.cardSpacing + pad * 2
+        updatePanelSize(CGSize(width: QuickAccessCard.cardWidth + pad * 2, height: height))
     }
 
     /// Called by the SwiftUI root whenever its natural size changes; the panel grows upward from its bottom-left corner.

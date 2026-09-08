@@ -77,7 +77,7 @@ final class OCRResultHUD {
         if let panel { return panel }
         let p = NSPanel(contentRect: CGRect(x: 0, y: 0, width: 240, height: 56),
                         styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        p.level = .statusBar
+        p.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 2) // visible on full-screen Spaces too
         p.isOpaque = false
         p.backgroundColor = .clear
         p.hasShadow = true
