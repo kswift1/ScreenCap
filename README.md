@@ -42,7 +42,7 @@ Default shortcuts (change them in Settings → Shortcuts):
 ./scripts/run.sh          # xcodegen + xcodebuild (Debug) + launch
 ```
 
-The default build is ad-hoc signed, so macOS may ask for Screen Recording permission again after each rebuild. To keep it, copy `project.local.example.yml` to `project.local.yml` and put your Apple Developer Team ID in it (the file is git-ignored and XcodeGen picks it up automatically).
+The default build is ad-hoc signed, so macOS may ask for Screen Recording permission again after each rebuild. To keep it, copy `scripts/local.env.example` to `scripts/local.env` and put your Apple Developer Team ID in it (the file is git-ignored; `scripts/build.sh` passes it to xcodebuild). In Xcode itself, pick your team in the target's Signing tab.
 
 `scripts/build.sh` only builds; the `.app` lands in `build/Build/Products/Debug/`. To work in Xcode, run `xcodegen generate` and open `ScreenCap.xcodeproj` (it's git-ignored; `project.yml` is the source of truth).
 

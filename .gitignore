@@ -5,4 +5,4 @@ DerivedData/
 *.xcworkspace
 xcuserdata/
 *.xcuserstate
-project.local.yml
+scripts/local.env
