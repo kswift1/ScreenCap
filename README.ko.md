@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/icon.png" width="160" alt="ScreenCap icon">
+</p>
+
 # ScreenCap
 
 [English](README.md) · **한국어**
