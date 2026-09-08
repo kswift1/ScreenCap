@@ -1,0 +1,46 @@
+name: ScreenCap
+options:
+  bundleIdPrefix: com.sungwon
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    DEVELOPMENT_TEAM: BAC795627G
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_HARDENED_RUNTIME: NO
+    SWIFT_STRICT_CONCURRENCY: minimal
+targets:
+  ScreenCap:
+    type: application
+    platform: macOS
+    sources:
+      - path: ScreenCap
+        excludes:
+          - "Info.plist"
+          - "ScreenCap.entitlements"
+    info:
+      path: ScreenCap/Info.plist
+      properties:
+        CFBundleDisplayName: ScreenCap
+        CFBundleName: ScreenCap
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSUIElement: true
+        LSMinimumSystemVersion: "15.0"
+        NSMicrophoneUsageDescription: "ScreenCap needs microphone access to record audio with your screen recordings."
+        NSHumanReadableCopyright: "© 2026 SungWon Kim"
+        NSPrincipalClass: NSApplication
+    entitlements:
+      path: ScreenCap/ScreenCap.entitlements
+      properties:
+        com.apple.security.app-sandbox: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sungwon.ScreenCap
+        PRODUCT_NAME: ScreenCap
+        GENERATE_INFOPLIST_FILE: NO
+        COMBINE_HIDPI_IMAGES: YES
