@@ -68,6 +68,8 @@ enum HotkeyAction: String, CaseIterable, Codable, Identifiable {
     case recognizeText
     case allInOne
     case togglePins
+    case scrollCapture
+    case openHistory
 
     var id: String { rawValue }
 
@@ -82,6 +84,8 @@ enum HotkeyAction: String, CaseIterable, Codable, Identifiable {
         case .recognizeText: return "Copy Text (OCR)"
         case .allInOne: return "All-in-One"
         case .togglePins: return "Hide/Show Pins"
+        case .scrollCapture: return "Scrolling Capture"
+        case .openHistory: return "Capture History"
         }
     }
 
@@ -96,6 +100,8 @@ enum HotkeyAction: String, CaseIterable, Codable, Identifiable {
         case .recognizeText: return "text.viewfinder"
         case .allInOne: return "square.grid.2x2"
         case .togglePins: return "pin.slash"
+        case .scrollCapture: return "arrow.up.and.down.text.horizontal"
+        case .openHistory: return "clock"
         }
     }
 
@@ -111,6 +117,8 @@ enum HotkeyAction: String, CaseIterable, Codable, Identifiable {
         case .recognizeText: return Hotkey(keyCode: UInt32(kVK_ANSI_7), carbonModifiers: shiftCmd)
         case .allInOne: return Hotkey(keyCode: UInt32(kVK_ANSI_8), carbonModifiers: shiftCmd)
         case .togglePins: return Hotkey(keyCode: UInt32(kVK_ANSI_9), carbonModifiers: shiftCmd)
+        case .scrollCapture: return Hotkey(keyCode: UInt32(kVK_ANSI_0), carbonModifiers: shiftCmd)
+        case .openHistory: return .none
         }
     }
 }

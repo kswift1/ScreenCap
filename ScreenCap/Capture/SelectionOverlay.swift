@@ -1,7 +1,7 @@
 import AppKit
 
 enum SelectionMode: CaseIterable {
-    case area, window, fullscreen, pin, record, ocr
+    case area, window, fullscreen, pin, record, ocr, scroll
 
     var hint: String {
         switch self {
@@ -11,13 +11,14 @@ enum SelectionMode: CaseIterable {
         case .window: return "Click a window to capture it  ·  Drag to select an area  ·  Esc to cancel"
         case .fullscreen: return "Click to capture the whole display under the mouse  ·  Esc to cancel"
         case .record: return "Drag to select the recording area  ·  Click a window to record it  ·  Esc to cancel"
+        case .scroll: return "Drag over the scrollable area to capture  ·  Click a window to capture all of it  ·  Esc to cancel"
         }
     }
 
     // MARK: All-in-One toolbar metadata
 
     /// Left-to-right order of the buttons in the All-in-One mode toolbar.
-    static let toolbarOrder: [SelectionMode] = [.area, .window, .fullscreen, .pin, .record, .ocr]
+    static let toolbarOrder: [SelectionMode] = [.area, .window, .fullscreen, .pin, .record, .ocr, .scroll]
 
     var title: String {
         switch self {
@@ -27,6 +28,7 @@ enum SelectionMode: CaseIterable {
         case .pin: return "Pin"
         case .record: return "Record"
         case .ocr: return "Text"
+        case .scroll: return "Scroll"
         }
     }
 
@@ -38,6 +40,7 @@ enum SelectionMode: CaseIterable {
         case .pin: return "pin"
         case .record: return "record.circle"
         case .ocr: return "text.viewfinder"
+        case .scroll: return "arrow.up.and.down.text.horizontal"
         }
     }
 
@@ -50,10 +53,11 @@ enum SelectionMode: CaseIterable {
         case .pin: return "p"
         case .record: return "r"
         case .ocr: return "t"
+        case .scroll: return "s"
         }
     }
 
-    /// Digit shortcut (1–6) matching the toolbar position.
+    /// Digit shortcut (1–7) matching the toolbar position.
     var digitKey: Character {
         Character(String(Self.toolbarOrder.firstIndex(of: self)! + 1))
     }

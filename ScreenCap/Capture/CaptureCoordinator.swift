@@ -21,6 +21,8 @@ final class CaptureCoordinator {
         case .recognizeText: startSelection(mode: .ocr)
         case .allInOne: startAllInOne()
         case .togglePins: PinController.shared.toggleHidden()
+        case .scrollCapture: startSelection(mode: .scroll)
+        case .openHistory: HistoryWindowController.shared.show()
         }
     }
 
@@ -91,6 +93,8 @@ final class CaptureCoordinator {
             // `.fullscreen` arrives here as the whole display frame and is handled like any area.
             if mode == .record {
                 Task { await ScreenRecorder.shared.start(screen: screen, rect: rect) }
+            } else if mode == .scroll {
+                Task { await ScrollCaptureController.shared.start(screen: screen, rect: rect.intersection(screen.frame)) }
             } else {
                 Task {
                     do {
@@ -113,6 +117,9 @@ final class CaptureCoordinator {
             if mode == .record {
                 let rect = info.frame.intersection(screen.frame)
                 Task { await ScreenRecorder.shared.start(screen: screen, rect: rect) }
+            } else if mode == .scroll {
+                let rect = info.frame.intersection(screen.frame)
+                Task { await ScrollCaptureController.shared.start(screen: screen, rect: rect) }
             } else {
                 Task {
                     do {
