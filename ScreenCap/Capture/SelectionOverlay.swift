@@ -231,20 +231,20 @@ final class OverlayView: NSView {
             border.stroke()
             drawHandles(for: sel)
             drawLabel("\(Int(sel.width)) × \(Int(sel.height))", near: sel)
-        } else if let w = hoveredWindow {
-            dim.setFill()
-            bounds.fill()
-            let r = viewRect(fromScreen: w.frame).intersection(bounds)
-            NSColor.controlAccentColor.withAlphaComponent(0.22).setFill()
-            NSBezierPath(roundedRect: r, xRadius: 8, yRadius: 8).fill()
-            NSColor.controlAccentColor.setStroke()
-            let p = NSBezierPath(roundedRect: r.insetBy(dx: 1, dy: 1), xRadius: 8, yRadius: 8)
-            p.lineWidth = 2
-            p.stroke()
-            drawLabel("\(w.displayName)   \(Int(w.frame.width)) × \(Int(w.frame.height))", near: r, inside: true)
         } else {
             dim.setFill()
             bounds.fill()
+
+            if let w = hoveredWindow {
+                // Subtle outline only: no fill, so a hovered full-screen app doesn't tint the whole display.
+                let r = viewRect(fromScreen: w.frame).intersection(bounds).insetBy(dx: 1, dy: 1)
+                let outline = NSBezierPath(roundedRect: r, xRadius: 6, yRadius: 6)
+                outline.lineWidth = 1.5
+                NSColor.white.withAlphaComponent(0.85).setStroke()
+                outline.stroke()
+                drawLabel("\(w.displayName)   \(Int(w.frame.width)) × \(Int(w.frame.height))", near: r, inside: true)
+            }
+
             if let m = mouseLocation {
                 NSColor.white.withAlphaComponent(0.55).setStroke()
                 let cross = NSBezierPath()
