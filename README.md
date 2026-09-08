@@ -42,6 +42,8 @@ Default shortcuts (change them in Settings → Shortcuts):
 ./scripts/run.sh          # xcodegen + xcodebuild (Debug) + launch
 ```
 
+The default build is ad-hoc signed, so macOS may ask for Screen Recording permission again after each rebuild. To keep it, copy `project.local.example.yml` to `project.local.yml` and put your Apple Developer Team ID in it (the file is git-ignored and XcodeGen picks it up automatically).
+
 `scripts/build.sh` only builds; the `.app` lands in `build/Build/Products/Debug/`. To work in Xcode, run `xcodegen generate` and open `ScreenCap.xcodeproj` (it's git-ignored; `project.yml` is the source of truth).
 
 Development flags:
@@ -70,3 +72,7 @@ Design notes:
 - Overlays and Quick Access are **non-activating `NSPanel`s**, so ScreenCap never steals focus and the app you're capturing doesn't dim.
 - Every ScreenCap window is excluded from the `SCContentFilter`, so the overlay, frame, and recording controls never appear in the output.
 - Annotations are rendered by one Core Graphics code path (`AnnotationRenderer`) for both the live canvas and the exported image, in y-down image-pixel coordinates.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

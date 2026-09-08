@@ -1,0 +1,8 @@
+# Copy to project.local.yml (git-ignored) and fill in your Apple Developer Team ID.
+# With a real team, macOS keeps the Screen Recording permission across rebuilds;
+# with ad-hoc signing (the default) you may be asked again after each build.
+settings:
+  base:
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "Apple Development"
+    DEVELOPMENT_TEAM: YOUR_TEAM_ID

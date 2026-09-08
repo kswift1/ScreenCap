@@ -42,6 +42,8 @@ CleanShot X를 벤치마킹한 macOS용 스크린샷·화면 녹화 앱입니다
 ./scripts/run.sh          # xcodegen + xcodebuild (Debug) + 실행
 ```
 
+기본 빌드는 ad-hoc 서명이라 다시 빌드할 때마다 macOS가 화면 녹화 권한을 다시 물을 수 있습니다. 권한을 유지하려면 `project.local.example.yml`을 `project.local.yml`로 복사하고 Apple Developer 팀 ID를 넣어 주세요. 이 파일은 git에서 제외되며 XcodeGen이 자동으로 읽습니다.
+
 `scripts/build.sh`는 빌드만 합니다. `.app`은 `build/Build/Products/Debug/`에 생성됩니다. Xcode에서 작업하려면 `xcodegen generate`를 실행한 뒤 `ScreenCap.xcodeproj`를 여세요. 프로젝트 파일은 git에서 제외되어 있고 `project.yml`이 원본입니다.
 
 개발용 실행 인자:
@@ -70,3 +72,7 @@ ScreenCap/
 - 오버레이와 Quick Access는 **non-activating `NSPanel`** 이라 ScreenCap이 포커스를 가져가지 않고, 캡처 대상 앱이 흐려지지 않습니다.
 - ScreenCap의 모든 창은 `SCContentFilter`에서 제외되므로 오버레이, 녹화 프레임, 녹화 컨트롤이 결과물에 찍히지 않습니다.
 - 주석은 화면 캔버스와 내보내기 이미지 모두 하나의 Core Graphics 코드(`AnnotationRenderer`)로 그립니다. 좌표는 y가 아래로 증가하는 이미지 픽셀 기준입니다.
+
+## 라이선스
+
+MIT — [LICENSE](LICENSE) 참고.
