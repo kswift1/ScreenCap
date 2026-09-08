@@ -2,15 +2,19 @@ import AppKit
 import SwiftUI
 
 /// The CleanShot-style stack of thumbnails in the bottom-left corner. Cards auto-dismiss
-/// unless hovered; drag them into other apps, or use the hover buttons.
+/// unless hovered; drag them into other apps, use the hover buttons, or press a single key
+/// while hovering (C copy, S save, ⇧S save as, E annotate, P pin, G GIF, O open, F Finder,
+/// ⌫/Esc dismiss, ⌘⌫ dismiss all).
 @MainActor
 final class QuickAccessController: ObservableObject {
     static let shared = QuickAccessController()
 
     @Published private(set) var items: [CaptureItem] = []
-    private var panel: NSPanel?
+    private var panel: QuickAccessPanel?
     private var dismissTasks: [UUID: Task<Void, Never>] = [:]
     private var hovering: Set<UUID> = []
+    /// The card currently under the mouse; single-key shortcuts act on it.
+    private weak var keyboardTarget: CaptureItem?
 
     func add(_ item: CaptureItem) {
         guard !items.contains(where: { $0.id == item.id }) else { return }
@@ -27,11 +31,29 @@ final class QuickAccessController: ObservableObject {
         withAnimation(animated ? .easeOut(duration: 0.18) : nil) {
             items.removeAll { $0.id == item.id }
         }
-        if items.isEmpty {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-                guard let self, self.items.isEmpty else { return }
-                self.panel?.orderOut(nil)
-            }
+        if keyboardTarget === item {
+            keyboardTarget = nil
+            releaseKeyboard()
+        }
+        hidePanelWhenEmpty()
+    }
+
+    /// Dismisses every card at once (⌘⌫ or the context menu).
+    func removeAll() {
+        dismissTasks.values.forEach { $0.cancel() }
+        dismissTasks.removeAll()
+        hovering.removeAll()
+        keyboardTarget = nil
+        withAnimation(.easeOut(duration: 0.18)) { items.removeAll() }
+        hidePanelWhenEmpty()
+    }
+
+    /// Hides the panel once the last card has faded out. Ordering out also drops key status.
+    private func hidePanelWhenEmpty() {
+        guard items.isEmpty else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            guard let self, self.items.isEmpty else { return }
+            self.panel?.orderOut(nil)
         }
     }
 
@@ -48,10 +70,75 @@ final class QuickAccessController: ObservableObject {
         if isHovering {
             hovering.insert(item.id)
             dismissTasks[item.id]?.cancel()
+            keyboardTarget = item
+            acquireKeyboard()
         } else {
             hovering.remove(item.id)
             scheduleDismiss(item)
+            if keyboardTarget === item {
+                keyboardTarget = nil
+                releaseKeyboard()
+            }
         }
+    }
+
+    // MARK: Keyboard
+
+    /// Routes keyboard input to the panel while a card is hovered. A `.nonactivatingPanel` may
+    /// become key without activating the app, so the front app keeps looking active while our
+    /// hosting view receives `keyDown`.
+    private func acquireKeyboard() {
+        guard let panel, panel.isVisible else { return }
+        if !panel.isKeyWindow { panel.makeKey() }
+        if let content = panel.contentView, panel.firstResponder !== content {
+            panel.makeFirstResponder(content)
+        }
+    }
+
+    /// Hands keyboard focus back to the front app when the mouse leaves. `resignKey()` is not meant
+    /// to be called directly and `NSApp.activate` is off-limits here, so we briefly order the panel
+    /// out — which makes it resign key — and immediately re-order it front without key status.
+    /// Both calls land in the same run-loop turn, so nothing visibly flickers.
+    private func releaseKeyboard() {
+        guard let panel, panel.isKeyWindow else { return }
+        panel.orderOut(nil)
+        if !items.isEmpty { panel.orderFrontRegardless() }
+    }
+
+    /// Handles a key press from the panel. Returns `false` for keys we don't own so the
+    /// hosting view can pass them along instead of swallowing them.
+    func handleKey(_ event: NSEvent) -> Bool {
+        let mods = event.modifierFlags
+            .intersection(.deviceIndependentFlagsMask)
+            .subtracting([.capsLock, .numericPad, .function])
+        let isDelete = event.keyCode == 51 || event.keyCode == 117   // ⌫ / ⌦
+        if isDelete && mods == .command {                            // ⌘⌫
+            removeAll()
+            return true
+        }
+        guard let item = keyboardTarget, items.contains(where: { $0.id == item.id }), !item.isBusy else {
+            return false
+        }
+        if (isDelete || event.keyCode == 53) && mods.isEmpty {       // ⌫ / ⌦ / Esc
+            remove(item)
+            return true
+        }
+        // Letters: plain or ⌘-prefixed both work; ⇧ picks the alternate (⇧S = Save As…).
+        guard mods.subtracting([.shift, .command]).isEmpty,
+              let key = event.charactersIgnoringModifiers?.lowercased() else { return false }
+        let shift = mods.contains(.shift)
+        switch key {
+        case "c" where !shift: copy(item)
+        case "s" where !shift: save(item)
+        case "s" where shift: saveAs(item)
+        case "e" where !shift && item.isImage: annotate(item)
+        case "p" where !shift && item.isImage: pin(item)
+        case "g" where !shift && item.isVideo: convertToGIF(item)
+        case "o" where !shift: openExternally(item)
+        case "f" where !shift: revealInFinder(item)
+        default: return false
+        }
+        return true
     }
 
     private func scheduleDismiss(_ item: CaptureItem) {
@@ -152,8 +239,8 @@ final class QuickAccessController: ObservableObject {
 
     private func showPanel() {
         if panel == nil {
-            let p = NSPanel(contentRect: CGRect(x: 0, y: 0, width: 260, height: 100),
-                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+            let p = QuickAccessPanel(contentRect: CGRect(x: 0, y: 0, width: 260, height: 100),
+                                     styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
             p.level = .statusBar
             p.isOpaque = false
             p.backgroundColor = .clear
@@ -162,7 +249,7 @@ final class QuickAccessController: ObservableObject {
             p.isFloatingPanel = true
             p.isReleasedWhenClosed = false
             p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
-            let hosting = NSHostingView(rootView: QuickAccessView(controller: self))
+            let hosting = QuickAccessHostingView(rootView: QuickAccessView(controller: self), controller: self)
             hosting.sizingOptions = []
             p.contentView = hosting
             panel = p
@@ -180,5 +267,36 @@ final class QuickAccessController: ObservableObject {
         guard let panel, size.width > 0, size.height > 0 else { return }
         let origin = panel.frame.origin
         panel.setFrame(CGRect(origin: origin, size: size), display: true)
+    }
+}
+
+/// Borderless non-activating panel that may still become key, so hovered cards can take single-key
+/// shortcuts without ScreenCap ever becoming the active app.
+final class QuickAccessPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+}
+
+/// Routes key presses to the controller; SwiftUI handles hover, buttons, and drag.
+final class QuickAccessHostingView: NSHostingView<QuickAccessView> {
+    private unowned let controller: QuickAccessController
+
+    init(rootView: QuickAccessView, controller: QuickAccessController) {
+        self.controller = controller
+        super.init(rootView: rootView)
+    }
+
+    @MainActor required init(rootView: QuickAccessView) { fatalError() }
+    @MainActor required init?(coder: NSCoder) { fatalError() }
+
+    override var acceptsFirstResponder: Bool { true }
+
+    override func keyDown(with event: NSEvent) {
+        if !controller.handleKey(event) { super.keyDown(with: event) }
+    }
+
+    /// ⌘-shortcuts (⌘⌫, ⌘C, ⌘S) arrive here before the main menu gets a chance to claim them.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        controller.handleKey(event) || super.performKeyEquivalent(with: event)
     }
 }
