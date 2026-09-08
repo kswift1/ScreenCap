@@ -4,6 +4,12 @@ import CoreImage.CIFilterBuiltins
 
 @MainActor
 final class AnnotationDocument: ObservableObject {
+    /// One undo step: the annotation list plus the background style at that moment.
+    struct Snapshot {
+        var annotations: [Annotation]
+        var background: BackgroundStyle
+    }
+
     let baseImage: CGImage
     let pixelScale: CGFloat
     var pixelSize: CGSize { CGSize(width: baseImage.width, height: baseImage.height) }
@@ -12,13 +18,20 @@ final class AnnotationDocument: ObservableObject {
     @Published var selectedID: UUID?
     @Published var tool: AnnotationTool = .arrow
     @Published var style = AnnotationStyle(color: .systemRed, lineWidth: 4, fontSize: 24)
-    @Published private(set) var undoStack: [[Annotation]] = []
-    @Published private(set) var redoStack: [[Annotation]] = []
+    /// Background/padding applied around the screenshot; restored from the last session.
+    @Published var backgroundStyle: BackgroundStyle = .load()
+    @Published private(set) var undoStack: [Snapshot] = []
+    @Published private(set) var redoStack: [Snapshot] = []
     @Published var isDirty = false
 
     var canUndo: Bool { !undoStack.isEmpty }
     var canRedo: Bool { !redoStack.isEmpty }
     var selected: Annotation? { annotations.first { $0.id == selectedID } }
+
+    /// Pixel geometry of the composite for the current background style.
+    var compositeLayout: CompositeLayout {
+        CompositeLayout(imageSize: pixelSize, style: backgroundStyle, pixelScale: pixelScale)
+    }
 
     lazy var pixelatedImage: CGImage? = makePixelated()
 
@@ -33,8 +46,10 @@ final class AnnotationDocument: ObservableObject {
 
     // MARK: Mutation with undo
 
+    private var snapshot: Snapshot { Snapshot(annotations: annotations, background: backgroundStyle) }
+
     func pushUndo() {
-        undoStack.append(annotations)
+        undoStack.append(snapshot)
         if undoStack.count > 100 { undoStack.removeFirst() }
         redoStack.removeAll()
         isDirty = true
@@ -59,15 +74,22 @@ final class AnnotationDocument: ObservableObject {
 
     func undo() {
         guard let prev = undoStack.popLast() else { return }
-        redoStack.append(annotations)
-        annotations = prev
-        selectedID = nil
+        redoStack.append(snapshot)
+        restore(prev)
     }
 
     func redo() {
         guard let next = redoStack.popLast() else { return }
-        undoStack.append(annotations)
-        annotations = next
+        undoStack.append(snapshot)
+        restore(next)
+    }
+
+    private func restore(_ s: Snapshot) {
+        annotations = s.annotations
+        if s.background != backgroundStyle {
+            backgroundStyle = s.background
+            backgroundStyle.save()
+        }
         selectedID = nil
     }
 
@@ -79,20 +101,61 @@ final class AnnotationDocument: ObservableObject {
         replace(a)
     }
 
+    // MARK: Background edits
+
+    private var backgroundGestureActive = false
+    private var lastBackgroundEditKey: String?
+    private var lastBackgroundEditTime: Date = .distantPast
+
+    /// Starts a continuous edit (slider drag): one undo step is recorded now, none until `endBackgroundGesture`.
+    func beginBackgroundGesture() {
+        guard !backgroundGestureActive else { return }
+        pushUndo()
+        backgroundGestureActive = true
+        lastBackgroundEditKey = nil
+    }
+
+    func endBackgroundGesture() {
+        guard backgroundGestureActive else { return }
+        backgroundGestureActive = false
+        backgroundStyle.save()
+    }
+
+    /// Applies a background change. Outside a gesture each call is its own undo step, except that
+    /// rapid successive edits sharing `coalescing` (e.g. the color picker) collapse into one.
+    func updateBackground(coalescing key: String? = nil, _ mutate: (inout BackgroundStyle) -> Void) {
+        var next = backgroundStyle
+        mutate(&next)
+        next = next.clamped()
+        guard next != backgroundStyle else { return }
+        if !backgroundGestureActive {
+            let now = Date()
+            let coalesce = key != nil && key == lastBackgroundEditKey && now.timeIntervalSince(lastBackgroundEditTime) < 1.0
+            if !coalesce { pushUndo() }
+            lastBackgroundEditKey = key
+            lastBackgroundEditTime = now
+        }
+        backgroundStyle = next
+        if !backgroundGestureActive { next.save() }
+    }
+
     // MARK: Rendering
 
+    /// The exported composite (background, padded screenshot, annotations) at full pixel size.
     func render() -> CGImage? {
-        let w = baseImage.width, h = baseImage.height
-        let space = baseImage.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
+        let layout = compositeLayout
+        let w = Int(layout.canvasSize.width.rounded()), h = Int(layout.canvasSize.height.rounded())
+        guard w > 0, h > 0 else { return nil }
+        let source = baseImage.colorSpace
+        let space = (source?.model == .rgb ? source : nil) ?? CGColorSpace(name: CGColorSpace.sRGB)!
         guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0, space: space,
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue) else { return nil }
         // Flip so the shared renderer can work in y-down image coordinates.
         ctx.translateBy(x: 0, y: CGFloat(h))
         ctx.scaleBy(x: 1, y: -1)
-        AnnotationRenderer.drawImage(baseImage, in: CGRect(origin: .zero, size: pixelSize), context: ctx)
-        for a in annotations {
-            AnnotationRenderer.draw(a, in: ctx, pixelScale: pixelScale, pixelated: pixelatedImage, imageSize: pixelSize)
-        }
+        AnnotationRenderer.drawComposite(image: baseImage, annotations: annotations, pixelated: pixelatedImage,
+                                         background: backgroundStyle, layout: layout, pixelScale: pixelScale,
+                                         shadowScale: 1, in: ctx)
         return ctx.makeImage()
     }
 
