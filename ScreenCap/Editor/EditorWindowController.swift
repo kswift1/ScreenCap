@@ -23,13 +23,13 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
         let pad = annotationDocument.backgroundStyle.padding * 2
         let logical = CGSize(width: CGFloat(image.width) / pixelScale + pad, height: CGFloat(image.height) / pixelScale + pad)
         let toolbarHeight: CGFloat = 52
-        let width = min(max(logical.width + 48, 720), screen.width * 0.9)
+        let width = min(max(logical.width + 48, 980), screen.width * 0.9)
         let height = min(max(logical.height + 48 + toolbarHeight, 480), screen.height * 0.9)
         let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: width, height: height),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = sourceItem?.url.lastPathComponent ?? "Annotate"
         window.isReleasedWhenClosed = false
-        window.minSize = CGSize(width: 600, height: 400)
+        window.minSize = CGSize(width: 980, height: 400)
         window.center()
         super.init(window: window)
         window.delegate = self
@@ -84,6 +84,11 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// Runs OCR on the current image and returns proposed redactions (empty when nothing matched).
+    func detectSensitiveText() async throws -> [SensitiveTextDetector.Proposal] {
+        try await SensitiveTextDetector.detect(in: annotationDocument.baseImage, pixelScale: annotationDocument.pixelScale)
+    }
+
     private func flashTitle(_ text: String) {
         guard let window else { return }
         let original = window.title
@@ -117,6 +122,9 @@ struct EditorView: View {
     @ObservedObject var document: AnnotationDocument
     unowned let controller: EditorWindowController
     @State private var showBackground = false
+    @State private var detecting = false
+    @State private var proposals: [SensitiveTextDetector.Proposal]?
+    @State private var detectionError: String?
 
     private let palette: [NSColor] = [.systemRed, .systemOrange, .systemYellow, .systemGreen, .systemBlue, .systemPurple, .black, .white]
 
@@ -127,8 +135,48 @@ struct EditorView: View {
                 .frame(height: 52)
                 .background(.bar)
             Divider()
+            if let crop = document.cropRect {
+                cropBar(crop)
+                Divider()
+            }
             AnnotationCanvas(document: document)
         }
+        .sheet(isPresented: Binding(get: { proposals != nil }, set: { if !$0 { proposals = nil } })) {
+            SensitiveTextSheet(proposals: proposals ?? []) { chosen in
+                applyRedactions(chosen)
+                proposals = nil
+            } onCancel: {
+                proposals = nil
+            }
+        }
+        .alert("Text detection failed", isPresented: Binding(get: { detectionError != nil }, set: { if !$0 { detectionError = nil } })) {
+            Button("OK") { detectionError = nil }
+        } message: {
+            Text(detectionError ?? "")
+        }
+    }
+
+    /// Second toolbar row shown while a crop rectangle is pending.
+    private func cropBar(_ crop: CGRect) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "crop")
+                .foregroundStyle(.secondary)
+            Text("Crop to \(Int(crop.width)) × \(Int(crop.height)) px")
+                .font(.callout.monospacedDigit())
+            Text("Drag again to choose a different area.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("Cancel") { document.cropRect = nil }
+                .help("Discard the crop rectangle (Esc)")
+            Button("Apply") { document.applyPendingCrop() }
+                .buttonStyle(.borderedProminent)
+                .help("Crop the image (↩)")
+        }
+        .controlSize(.small)
+        .padding(.horizontal, 12)
+        .frame(height: 34)
+        .background(Color.accentColor.opacity(0.08))
     }
 
     private var toolbar: some View {
@@ -142,7 +190,15 @@ struct EditorView: View {
                         .foregroundStyle(document.tool == tool ? Color.accentColor : .primary)
                 }
                 .buttonStyle(.plain)
-                .help("\(tool.title) (\(tool.shortcut.uppercased()))")
+                .help(toolHelp(tool))
+            }
+
+            Divider().frame(height: 22).padding(.horizontal, 4)
+
+            toolbarToggle(symbol: "point.topleft.down.to.point.bottomright.curvepath", active: document.curvedArrows,
+                          help: "Curved arrows (⇧-drag toggles for one arrow)") {
+                document.curvedArrows.toggle()
+                if document.tool != .arrow { document.tool = .arrow }
             }
 
             Divider().frame(height: 22).padding(.horizontal, 4)
@@ -190,17 +246,20 @@ struct EditorView: View {
 
             Divider().frame(height: 22).padding(.horizontal, 4)
 
-            Button { showBackground.toggle() } label: {
-                Image(systemName: "rectangle.on.rectangle.angled")
-                    .font(.system(size: 14, weight: .medium))
-                    .frame(width: 32, height: 28)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(backgroundActive ? Color.accentColor.opacity(0.22) : .clear))
-                    .foregroundStyle(backgroundActive ? Color.accentColor : .primary)
+            toolbarToggle(symbol: "rectangle.on.rectangle.angled", active: backgroundActive, help: "Background & padding") {
+                showBackground.toggle()
             }
-            .buttonStyle(.plain)
-            .help("Background & padding")
             .popover(isPresented: $showBackground, arrowEdge: .bottom) {
                 BackgroundInspector(document: document)
+            }
+
+            toolbarToggle(symbol: "eye.trianglebadge.exclamationmark", active: detecting,
+                          help: "Detect sensitive text (emails, phones, IPs, API keys) and pixelate it") {
+                detectSensitiveText()
+            }
+            .disabled(detecting)
+            .overlay(alignment: .bottomTrailing) {
+                if detecting { ProgressView().controlSize(.mini).offset(x: 2, y: 2) }
             }
 
             Spacer()
@@ -226,6 +285,52 @@ struct EditorView: View {
     /// Highlights the Background button while the popover is open or a background/padding is in effect.
     private var backgroundActive: Bool {
         showBackground || document.backgroundStyle.kind != .none || document.backgroundStyle.padding > 0
+    }
+
+    /// Tool-button style: icon only, tinted while active.
+    private func toolbarToggle(symbol: String, active: Bool, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .medium))
+                .frame(width: 32, height: 28)
+                .background(RoundedRectangle(cornerRadius: 6).fill(active ? Color.accentColor.opacity(0.22) : .clear))
+                .foregroundStyle(active ? Color.accentColor : .primary)
+        }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+
+    private func toolHelp(_ tool: AnnotationTool) -> String {
+        var s = "\(tool.title) (\(tool.shortcut.uppercased()))"
+        if let hint = tool.shiftHint { s += " · \(hint)" }
+        return s
+    }
+
+    // MARK: Sensitive text
+
+    private func detectSensitiveText() {
+        guard !detecting else { return }
+        detecting = true
+        Task { @MainActor in
+            defer { detecting = false }
+            do {
+                proposals = try await controller.detectSensitiveText()
+            } catch {
+                detectionError = error.localizedDescription
+            }
+        }
+    }
+
+    /// Adds the chosen redactions as Pixelate annotations in a single undo step.
+    private func applyRedactions(_ chosen: [SensitiveTextDetector.Proposal]) {
+        let bounds = CGRect(origin: .zero, size: document.pixelSize)
+        let list = chosen.compactMap { p -> Annotation? in
+            let r = p.rect.intersection(bounds).integral
+            guard r.width > 1, r.height > 1 else { return nil }
+            return Annotation(shape: .blur(r), style: document.style)
+        }
+        document.addAll(list)
+        document.selectedID = nil
     }
 
     private func setColor(_ c: NSColor) {

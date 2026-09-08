@@ -39,6 +39,11 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate, NSMenuItemValidat
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.needsLayout = true }
             .store(in: &cancellables)
+        // Crop replaces the image, so re-fit the zoom for the new pixel size.
+        document.$baseImage
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.needsLayout = true }
+            .store(in: &cancellables)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -120,6 +125,8 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate, NSMenuItemValidat
                                          shadowScale: zoom, in: ctx)
         ctx.restoreGState()
 
+        if let crop = pendingCrop ?? document.cropRect { drawCropOverlay(crop, in: ctx) }
+
         if let sel = document.selected, sel.id != editingTextID {
             let b = AnnotationRenderer.bounds(of: sel, pixelScale: document.pixelScale)
             let vr = CGRect(origin: viewPoint(b.origin), size: CGSize(width: b.width * zoom, height: b.height * zoom)).insetBy(dx: -4, dy: -4)
@@ -131,7 +138,35 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate, NSMenuItemValidat
         }
     }
 
+    /// Canvas-only decoration for the Crop tool: dims everything outside the pending rect and outlines it.
+    private func drawCropOverlay(_ crop: CGRect, in ctx: CGContext) {
+        let vr = CGRect(origin: viewPoint(crop.origin), size: CGSize(width: crop.width * zoom, height: crop.height * zoom))
+        ctx.saveGState()
+        ctx.setFillColor(CGColor(gray: 0, alpha: 0.5))
+        ctx.addRect(bounds)
+        ctx.addRect(vr)
+        ctx.fillPath(using: .evenOdd)
+        ctx.restoreGState()
+        let path = NSBezierPath(rect: vr.insetBy(dx: -0.5, dy: -0.5))
+        path.lineWidth = 1.5
+        NSColor.white.setStroke()
+        path.stroke()
+        // Rule-of-thirds guides.
+        let guides = NSBezierPath()
+        for i in 1...2 {
+            let f = CGFloat(i) / 3
+            guides.move(to: CGPoint(x: vr.minX + vr.width * f, y: vr.minY)); guides.line(to: CGPoint(x: vr.minX + vr.width * f, y: vr.maxY))
+            guides.move(to: CGPoint(x: vr.minX, y: vr.minY + vr.height * f)); guides.line(to: CGPoint(x: vr.maxX, y: vr.minY + vr.height * f))
+        }
+        guides.lineWidth = 0.5
+        NSColor.white.withAlphaComponent(0.4).setStroke()
+        guides.stroke()
+    }
+
     // MARK: Mouse
+
+    /// Crop rect being dragged out right now (committed to the document on mouse-up).
+    private var pendingCrop: CGRect?
 
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
@@ -174,6 +209,15 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate, NSMenuItemValidat
             inProgress = Annotation(shape: .highlighter([p]), style: style)
         case .blur:
             inProgress = Annotation(shape: .blur(CGRect(origin: p, size: .zero)), style: style)
+        case .blackout:
+            inProgress = Annotation(shape: .blackout(CGRect(origin: p, size: .zero)), style: style)
+        case .spotlight:
+            inProgress = Annotation(shape: .spotlight(CGRect(origin: p, size: .zero), ellipse: event.modifierFlags.contains(.shift)), style: style)
+        case .crop:
+            document.selectedID = nil
+            document.cropRect = nil
+            pendingCrop = CGRect(origin: p, size: .zero)
+            dragStartDoc = p
         }
         if inProgress != nil {
             document.selectedID = nil
@@ -191,14 +235,27 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate, NSMenuItemValidat
             document.replace(original.translated(by: CGPoint(x: p.x - start.x, y: p.y - start.y)))
             return
         }
-        guard var a = inProgress else { return }
         let shift = event.modifierFlags.contains(.shift)
+        if pendingCrop != nil {
+            pendingCrop = rect(start, p, square: shift)
+            needsDisplay = true
+            return
+        }
+        guard var a = inProgress else { return }
         switch a.shape {
-        case .arrow: a.shape = .arrow(from: start, to: shift ? snapAngle(start, p) : p)
+        case .arrow, .curvedArrow:
+            // ⇧ inverts the toolbar's curved-arrow setting for this one arrow.
+            if document.curvedArrows != shift {
+                a.shape = .curvedArrow(from: start, to: p, control: Annotation.curveControl(from: start, to: p))
+            } else {
+                a.shape = .arrow(from: start, to: p)
+            }
         case .line: a.shape = .line(from: start, to: shift ? snapAngle(start, p) : p)
         case .rect: a.shape = .rect(rect(start, p, square: shift))
         case .ellipse: a.shape = .ellipse(rect(start, p, square: shift))
         case .blur: a.shape = .blur(rect(start, p, square: shift))
+        case .blackout: a.shape = .blackout(rect(start, p, square: shift))
+        case .spotlight: a.shape = .spotlight(rect(start, p, square: false), ellipse: shift)
         case .pen(var pts): pts.append(p); a.shape = .pen(pts)
         case .highlighter(var pts): pts.append(p); a.shape = .highlighter(pts)
         default: break
@@ -208,6 +265,10 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate, NSMenuItemValidat
     }
 
     override func mouseUp(with event: NSEvent) {
+        if let crop = pendingCrop {
+            pendingCrop = nil
+            if crop.width > 3 && crop.height > 3 { document.cropRect = crop.integral }
+        }
         if let a = inProgress {
             if a.isMeaningful {
                 document.add(a)
@@ -242,8 +303,10 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate, NSMenuItemValidat
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         switch event.keyCode {
         case 53: // Esc
-            if textField != nil { cancelText() } else { document.selectedID = nil }
+            if textField != nil { cancelText() } else if document.cropRect != nil { document.cropRect = nil } else { document.selectedID = nil }
             return
+        case 36, 76: // Return / Enter
+            if document.cropRect != nil { document.applyPendingCrop(); return }
         case 51, 117: // Delete / Forward delete
             if document.selectedID != nil { document.removeSelected(); return }
         default: break
