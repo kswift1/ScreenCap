@@ -65,6 +65,8 @@ enum HotkeyAction: String, CaseIterable, Codable, Identifiable {
     case pinArea
     case toggleRecording
     case openLastCapture
+    case recognizeText
+    case allInOne
 
     var id: String { rawValue }
 
@@ -76,6 +78,8 @@ enum HotkeyAction: String, CaseIterable, Codable, Identifiable {
         case .pinArea: return "Pin Area"
         case .toggleRecording: return "Record Screen"
         case .openLastCapture: return "Open Last Capture"
+        case .recognizeText: return "Copy Text (OCR)"
+        case .allInOne: return "All-in-One"
         }
     }
 
@@ -87,6 +91,8 @@ enum HotkeyAction: String, CaseIterable, Codable, Identifiable {
         case .pinArea: return "pin"
         case .toggleRecording: return "record.circle"
         case .openLastCapture: return "clock.arrow.circlepath"
+        case .recognizeText: return "text.viewfinder"
+        case .allInOne: return "square.grid.2x2"
         }
     }
 
@@ -99,6 +105,8 @@ enum HotkeyAction: String, CaseIterable, Codable, Identifiable {
         case .pinArea: return Hotkey(keyCode: UInt32(kVK_ANSI_4), carbonModifiers: shiftCmd)
         case .toggleRecording: return Hotkey(keyCode: UInt32(kVK_ANSI_5), carbonModifiers: shiftCmd)
         case .openLastCapture: return Hotkey(keyCode: UInt32(kVK_ANSI_6), carbonModifiers: shiftCmd)
+        case .recognizeText: return Hotkey(keyCode: UInt32(kVK_ANSI_7), carbonModifiers: shiftCmd)
+        case .allInOne: return Hotkey(keyCode: UInt32(kVK_ANSI_8), carbonModifiers: shiftCmd)
         }
     }
 }

@@ -1,10 +1,11 @@
 import AppKit
 
 enum SelectionMode {
-    case area, window, record, pin
+    case area, window, record, pin, ocr
 
     var hint: String {
         switch self {
+        case .ocr: return "Drag over text to copy it  ·  Click a window to read all of it  ·  Esc to cancel"
         case .pin: return "Drag to pin an area on top of everything  ·  Click a window to pin it  ·  Esc to cancel"
         case .area: return "Drag to select an area  ·  Click a window to capture it  ·  Esc to cancel"
         case .window: return "Click a window to capture it  ·  Drag to select an area  ·  Esc to cancel"

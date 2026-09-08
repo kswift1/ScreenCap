@@ -16,6 +16,8 @@ final class CaptureCoordinator {
         case .pinArea: startSelection(mode: .pin)
         case .toggleRecording: toggleRecording()
         case .openLastCapture: QuickAccessController.shared.showLast()
+        case .recognizeText: startSelection(mode: .ocr)
+        case .allInOne: startSelection(mode: .area) // TODO(all-in-one): overlay with mode toolbar
         }
     }
 
@@ -80,6 +82,8 @@ final class CaptureCoordinator {
                         let image = try await CaptureEngine.captureDisplay(screen, rect: rect)
                         if mode == .pin {
                             pin(image: image, pixelScale: screen.backingScaleFactor, at: rect.intersection(screen.frame))
+                        } else if mode == .ocr {
+                            await OCRController.shared.recognizeAndCopy(image: image, sourceRect: rect)
                         } else {
                             finish(image: image, pixelScale: screen.backingScaleFactor, sourceRect: rect)
                         }
@@ -106,6 +110,8 @@ final class CaptureCoordinator {
                         }
                         if mode == .pin {
                             pin(image: image, pixelScale: screen.backingScaleFactor, at: info.frame)
+                        } else if mode == .ocr {
+                            await OCRController.shared.recognizeAndCopy(image: image, sourceRect: info.frame)
                         } else {
                             finish(image: image, pixelScale: screen.backingScaleFactor, sourceRect: info.frame)
                         }
