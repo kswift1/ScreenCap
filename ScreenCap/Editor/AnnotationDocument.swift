@@ -4,19 +4,28 @@ import CoreImage.CIFilterBuiltins
 
 @MainActor
 final class AnnotationDocument: ObservableObject {
-    /// One undo step: the annotation list plus the background style at that moment.
+    /// One undo step: the annotation list, the background style and the base image at that moment.
+    /// The image is only a reference, so snapshots are cheap unless a crop actually replaced it.
     struct Snapshot {
         var annotations: [Annotation]
         var background: BackgroundStyle
+        var image: CGImage
     }
 
-    let baseImage: CGImage
+    /// The screenshot being annotated; replaced by Crop (undoable).
+    @Published private(set) var baseImage: CGImage
     let pixelScale: CGFloat
     var pixelSize: CGSize { CGSize(width: baseImage.width, height: baseImage.height) }
 
     @Published var annotations: [Annotation] = []
     @Published var selectedID: UUID?
-    @Published var tool: AnnotationTool = .arrow
+    @Published var tool: AnnotationTool = .arrow {
+        didSet { if tool != .crop { cropRect = nil } }
+    }
+    /// Arrow tool draws curved arrows when on (⇧ while dragging inverts this for one arrow).
+    @Published var curvedArrows = false
+    /// Pending crop rectangle (image pixels) chosen with the Crop tool; nil when no crop is pending.
+    @Published var cropRect: CGRect?
     @Published var style = AnnotationStyle(color: .systemRed, lineWidth: 4, fontSize: 24)
     /// Background/padding applied around the screenshot; restored from the last session.
     @Published var backgroundStyle: BackgroundStyle = .load()
@@ -33,7 +42,12 @@ final class AnnotationDocument: ObservableObject {
         CompositeLayout(imageSize: pixelSize, style: backgroundStyle, pixelScale: pixelScale)
     }
 
-    lazy var pixelatedImage: CGImage? = makePixelated()
+    private var pixelatedCache: CGImage?
+    /// Pixelated copy of the base image for the Pixelate tool (rebuilt after a crop).
+    var pixelatedImage: CGImage? {
+        if pixelatedCache == nil { pixelatedCache = makePixelated() }
+        return pixelatedCache
+    }
 
     init(image: CGImage, pixelScale: CGFloat) {
         self.baseImage = image
@@ -46,7 +60,7 @@ final class AnnotationDocument: ObservableObject {
 
     // MARK: Mutation with undo
 
-    private var snapshot: Snapshot { Snapshot(annotations: annotations, background: backgroundStyle) }
+    private var snapshot: Snapshot { Snapshot(annotations: annotations, background: backgroundStyle, image: baseImage) }
 
     func pushUndo() {
         undoStack.append(snapshot)
@@ -58,6 +72,13 @@ final class AnnotationDocument: ObservableObject {
     func add(_ a: Annotation) {
         pushUndo()
         annotations.append(a)
+    }
+
+    /// Adds several annotations as a single undo step (no-op for an empty list).
+    func addAll(_ list: [Annotation]) {
+        guard !list.isEmpty else { return }
+        pushUndo()
+        annotations.append(contentsOf: list)
     }
 
     func replace(_ a: Annotation) {
@@ -85,18 +106,48 @@ final class AnnotationDocument: ObservableObject {
     }
 
     private func restore(_ s: Snapshot) {
+        if s.image !== baseImage {
+            baseImage = s.image
+            pixelatedCache = nil
+        }
         annotations = s.annotations
         if s.background != backgroundStyle {
             backgroundStyle = s.background
             backgroundStyle.save()
         }
         selectedID = nil
+        cropRect = nil
+    }
+
+    // MARK: Crop
+
+    /// Replaces the base image with `rect` (image pixels) and shifts every annotation so it stays put
+    /// relative to the picture. One undo step restores both the image and the annotations.
+    func applyCrop(_ rect: CGRect) {
+        let r = rect.integral.intersection(CGRect(origin: .zero, size: pixelSize))
+        guard r.width >= 1, r.height >= 1, let cropped = baseImage.cropping(to: r) else { cropRect = nil; return }
+        pushUndo()
+        baseImage = cropped
+        pixelatedCache = nil
+        annotations = annotations.map { $0.translated(by: CGPoint(x: -r.minX, y: -r.minY)) }
+        selectedID = nil
+        cropRect = nil
+    }
+
+    /// Applies the pending crop, if any.
+    func applyPendingCrop() {
+        if let r = cropRect { applyCrop(r) }
     }
 
     /// Applies the current color/width to the selected annotation (used when the palette changes).
+    /// Spotlights share one dim layer, so restyling one restyles them all.
     func applyStyleToSelection() {
         guard var a = selected else { return }
         pushUndo()
+        if a.isSpotlight {
+            for i in annotations.indices where annotations[i].isSpotlight { annotations[i].style = style }
+            return
+        }
         a.style = style
         replace(a)
     }
