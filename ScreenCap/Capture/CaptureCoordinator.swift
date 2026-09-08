@@ -5,7 +5,12 @@ import AppKit
 final class CaptureCoordinator {
     static let shared = CaptureCoordinator()
 
-    private(set) var history: [CaptureItem] = []
+    /// Every capture this app has made, oldest first, persisted by `HistoryStore`. Entries whose
+    /// file has disappeared (temp cleanup, Finder) are dropped on each read.
+    var history: [CaptureItem] {
+        HistoryStore.shared.pruneMissing()
+        return HistoryStore.shared.items
+    }
     private var selection: SelectionSession?
     /// Mode the All-in-One overlay opens in: whatever was used there last (this app session only).
     private var lastAllInOneMode: SelectionMode = .area
@@ -166,7 +171,7 @@ final class CaptureCoordinator {
         do {
             let item = try CaptureItem(image: image, pixelScale: pixelScale)
             item.sourceRect = rect
-            history.append(item)
+            HistoryStore.shared.add(item)
             SoundPlayer.playCapture()
             PinController.shared.pin(item, at: rect)
         } catch {
@@ -184,8 +189,7 @@ final class CaptureCoordinator {
     }
 
     private func publish(_ item: CaptureItem) {
-        history.append(item)
-        if history.count > 30 { history.removeFirst(history.count - 30) }
+        HistoryStore.shared.add(item)
 
         let autoSave = Preferences.autoSave
         let showQA = Preferences.showQuickAccess
