@@ -18,6 +18,7 @@ final class CaptureCoordinator {
         case .openLastCapture: QuickAccessController.shared.showLast()
         case .recognizeText: startSelection(mode: .ocr)
         case .allInOne: startSelection(mode: .area) // TODO(all-in-one): overlay with mode toolbar
+        case .togglePins: PinController.shared.toggleHidden()
         }
     }
 

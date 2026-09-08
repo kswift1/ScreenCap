@@ -31,6 +31,11 @@ final class PinController: ObservableObject {
         panel.present()
     }
 
+    /// Hides every pin or brings them all back. Stub: filled in by the pin work stream.
+    func toggleHidden() {
+        NSLog("toggleHidden not implemented yet")
+    }
+
     func closeAll() {
         for p in pins { p.close() }
         pins.removeAll()
