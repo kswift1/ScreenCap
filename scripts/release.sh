@@ -180,14 +180,14 @@ info "Hardened runtime: on · version $BUILT_VERSION ($NEW_BUILD)"
 # ---------------------------------------------------------------- notarize helper
 # notarize <file>: submit, wait, fail with the notary log if not Accepted.
 notarize() {
-  local file="$1" out id status
+  local file="$1" out id verdict
   out="$(xcrun notarytool submit "$file" --keychain-profile "$NOTARY_PROFILE" --wait 2>&1)" || true
   print -- "$out" | sed 's/^/    /'
   id="$(print -- "$out" | sed -nE 's/^ *id: ([0-9a-f-]+).*/\1/p' | head -1)"
-  status="$(print -- "$out" | sed -nE 's/^ *status: (.*)$/\1/p' | tail -1)"
-  if [[ "$status" != "Accepted" ]]; then
+  verdict="$(print -- "$out" | sed -nE 's/^ *status: (.*)$/\1/p' | tail -1)"
+  if [[ "$verdict" != "Accepted" ]]; then
     [[ -n "$id" ]] && xcrun notarytool log "$id" --keychain-profile "$NOTARY_PROFILE" 2>&1 | sed 's/^/    /' || true
-    die "notarization of $file failed (status: ${status:-unknown})"
+    die "notarization of $file failed (status: ${verdict:-unknown})"
   fi
 }
 
