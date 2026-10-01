@@ -334,9 +334,12 @@ struct PinContentView: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             if let image = panel.item.image {
+                // The hosting view swallows mouse-downs, so isMovableByWindowBackground alone never
+                // moves the panel. Only the image carries the drag, so the buttons above it keep their clicks.
                 Image(nsImage: image.nsImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
+                    .gesture(WindowDragGesture())
             }
 
             if hovering {
