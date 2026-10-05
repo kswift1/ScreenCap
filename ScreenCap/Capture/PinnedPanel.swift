@@ -236,6 +236,7 @@ final class PinnedPanel: NSPanel {
 /// Routes scroll / pinch / keys to the panel; SwiftUI handles hover and buttons.
 final class PinHostingView: NSHostingView<PinContentView> {
     private weak var panel: PinnedPanel?
+    private var mouseDownEvent: NSEvent?
 
     init(rootView: PinContentView, panel: PinnedPanel) {
         self.panel = panel
@@ -270,7 +271,38 @@ final class PinHostingView: NSHostingView<PinContentView> {
             panel?.resetZoom()
             return
         }
+        mouseDownEvent = event
         super.mouseDown(with: event)
+    }
+
+    /// NSHostingView doesn't take part in `isMovableByWindowBackground`, so start the window drag
+    /// ourselves once the pointer moves — except when the press began on the close button or action bar.
+    override func mouseDragged(with event: NSEvent) {
+        guard let panel, !panel.isLocked, let down = mouseDownEvent else {
+            super.mouseDragged(with: event)
+            return
+        }
+        let start = convert(down.locationInWindow, from: nil)
+        let now = convert(event.locationInWindow, from: nil)
+        guard hypot(now.x - start.x, now.y - start.y) > 3 else { return }
+        mouseDownEvent = nil
+        if isOnControl(start) {
+            super.mouseDragged(with: event)
+        } else {
+            panel.performDrag(with: down)
+        }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        mouseDownEvent = nil
+        super.mouseUp(with: event)
+    }
+
+    /// Rough hit areas of the hover-only controls (close button top-left, action bar bottom-centre).
+    private func isOnControl(_ point: CGPoint) -> Bool {
+        let y = isFlipped ? point.y : bounds.height - point.y   // distance from the top
+        if point.x < 32 && y < 32 { return true }
+        return abs(point.x - bounds.midX) < 70 && y > bounds.height - 48
     }
 
     override func keyDown(with event: NSEvent) {
